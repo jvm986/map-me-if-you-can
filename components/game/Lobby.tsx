@@ -1,14 +1,14 @@
 'use client';
 
-import { Game, Player } from '@/types/game';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { startSubmissionPhase } from '@/lib/game-actions';
-import { toast } from 'sonner';
+import { Check, Copy } from 'lucide-react';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import JoinGameForm from '../landing/JoinGameForm';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { startSubmissionPhase } from '@/lib/game-actions';
+import { Game, Player } from '@/types/game';
+import QuickJoinForm from '../landing/QuickJoinForm';
+import PlayerAvatar from '../shared/PlayerAvatar';
 
 interface LobbyProps {
   game: Game;
@@ -17,30 +17,30 @@ interface LobbyProps {
   gameCode: string;
 }
 
-export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyProps) {
-  const router = useRouter();
+export default function Lobby({ players, currentPlayer, gameCode }: LobbyProps) {
   const [isStarting, setIsStarting] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleStartSubmissions = async () => {
     setIsStarting(true);
     try {
       const result = await startSubmissionPhase(gameCode);
       if (result.success) {
-        toast.success('Submission phase started!');
+        // Don't reset isStarting - let the component unmount when phase changes
+        // This keeps the button disabled until the phase actually updates
       } else {
-        toast.error(result.error || 'Failed to start submissions');
+        setIsStarting(false); // Only reset on error
       }
     } catch (error) {
-      toast.error('An unexpected error occurred');
       console.error(error);
-    } finally {
-      setIsStarting(false);
+      setIsStarting(false); // Only reset on error
     }
   };
 
   const copyGameCode = () => {
     navigator.clipboard.writeText(gameCode);
-    toast.success('Game code copied to clipboard!');
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   // If player hasn't joined yet, show join form
@@ -50,10 +50,11 @@ export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyP
         <div className="max-w-md mx-auto mt-20">
           <Card>
             <CardHeader>
-              <CardTitle>Join Game: {gameCode}</CardTitle>
+              <CardTitle>Join Game</CardTitle>
+              <p className="text-sm text-gray-600">Game Code: {gameCode}</p>
             </CardHeader>
             <CardContent>
-              <JoinGameForm />
+              <QuickJoinForm gameCode={gameCode} />
             </CardContent>
           </Card>
         </div>
@@ -68,9 +69,7 @@ export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyP
       <div className="max-w-2xl mx-auto py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            🗺️ Map Me If You Can
-          </h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Map Me If You Can</h1>
           <p className="text-lg text-gray-600">Waiting for players...</p>
         </div>
 
@@ -83,8 +82,8 @@ export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyP
                 <code className="text-3xl font-mono font-bold bg-gray-100 px-4 py-2 rounded">
                   {gameCode}
                 </code>
-                <Button variant="outline" size="sm" onClick={copyGameCode}>
-                  Copy
+                <Button variant="outline" size="icon" onClick={copyGameCode}>
+                  {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
               <p className="text-sm text-gray-500 mt-2">
@@ -107,16 +106,12 @@ export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyP
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{player.avatar_emoji || '👤'}</span>
+                    <PlayerAvatar displayName={player.display_name} size="md" />
                     <span className="font-medium">{player.display_name}</span>
                   </div>
                   <div className="flex gap-2">
-                    {player.is_host && (
-                      <Badge variant="secondary">Host</Badge>
-                    )}
-                    {player.id === currentPlayer.id && (
-                      <Badge>You</Badge>
-                    )}
+                    {player.is_host && <Badge variant="secondary">Host</Badge>}
+                    {player.id === currentPlayer.id && <Badge>You</Badge>}
                   </div>
                 </div>
               ))}
@@ -132,7 +127,8 @@ export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyP
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-gray-600">
-                When everyone has joined, start the submission phase so players can upload their photos.
+                When everyone has joined, start the submission phase so players can upload their
+                photos.
               </p>
               <Button
                 onClick={handleStartSubmissions}
@@ -156,7 +152,8 @@ export default function Lobby({ game, players, currentPlayer, gameCode }: LobbyP
           <Card>
             <CardContent className="pt-6">
               <p className="text-center text-gray-600">
-                Waiting for {players.find((p) => p.is_host)?.display_name} (host) to start the game...
+                Waiting for {players.find((p) => p.is_host)?.display_name} (host) to start the
+                game...
               </p>
             </CardContent>
           </Card>

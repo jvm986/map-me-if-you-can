@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { getGame, getPhotoSubmissions } from '@/lib/game-actions';
 import GameClient from '@/components/game/GameClient';
+import { getGame, getPhotoSubmissions } from '@/lib/game-actions';
 
 export default async function GamePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;

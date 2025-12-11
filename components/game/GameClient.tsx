@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Game, Player, PhotoSubmission } from '@/types/game';
-import Lobby from './Lobby';
-import SubmissionPhase from './SubmissionPhase';
-import RoundPhase from './RoundPhase';
-import FinalResults from './FinalResults';
 import { getGame, getPhotoSubmissions } from '@/lib/game-actions';
+import { createClient } from '@/lib/supabase/client';
+import { Game, PhotoSubmission, Player } from '@/types/game';
+import FinalResults from './FinalResults';
+import Lobby from './Lobby';
+import RoundPhase from './RoundPhase';
+import SubmissionPhase from './SubmissionPhase';
 
 interface GameClientProps {
   initialGame: Game;
@@ -32,36 +33,82 @@ export default function GameClient({
     setCurrentPlayerId(playerId);
   }, [gameCode]);
 
-  // Poll for game updates every 3 seconds
+  // Subscribe to realtime updates
   useEffect(() => {
-    const interval = setInterval(async () => {
-      const { game: updatedGame, players: updatedPlayers } = await getGame(gameCode);
-      if (updatedGame) {
-        setGame(updatedGame);
-        setPlayers(updatedPlayers);
+    const supabase = createClient();
 
-        // Fetch submissions if we're past lobby
-        if (updatedGame.status !== 'lobby') {
-          const updatedSubmissions = await getPhotoSubmissions(updatedGame.id);
+    // Subscribe to game changes
+    const gameChannel = supabase
+      .channel(`game-${gameCode}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'games', filter: `code=eq.${gameCode}` },
+        async () => {
+          const { game: updatedGame, players: updatedPlayers } = await getGame(gameCode);
+          if (updatedGame) {
+            setGame(updatedGame);
+            setPlayers(updatedPlayers);
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to player changes
+    const playerChannel = supabase
+      .channel(`players-${gameCode}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'players', filter: `game_id=eq.${initialGame.id}` },
+        async () => {
+          const { players: updatedPlayers } = await getGame(gameCode);
+          setPlayers(updatedPlayers);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to submission changes
+    const submissionChannel = supabase
+      .channel(`submissions-${gameCode}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'photo_submissions',
+          filter: `game_id=eq.${initialGame.id}`,
+        },
+        async () => {
+          const updatedSubmissions = await getPhotoSubmissions(initialGame.id);
           setSubmissions(updatedSubmissions);
         }
-      }
-    }, 3000);
+      )
+      .subscribe();
 
-    return () => clearInterval(interval);
-  }, [gameCode]);
+    return () => {
+      supabase.removeChannel(gameChannel);
+      supabase.removeChannel(playerChannel);
+      supabase.removeChannel(submissionChannel);
+    };
+  }, [gameCode, initialGame.id]);
+
+  // Clear submissions when game restarts (goes back to submission phase)
+  useEffect(() => {
+    if (game.status === 'submission' && game.current_photo_index === 0) {
+      // Fetch fresh submissions (should be empty after restart)
+      const fetchSubmissions = async () => {
+        const updatedSubmissions = await getPhotoSubmissions(game.id);
+        setSubmissions(updatedSubmissions);
+      };
+      fetchSubmissions();
+    }
+  }, [game.status, game.current_photo_index, game.id]);
 
   const currentPlayer = players.find((p) => p.id === currentPlayerId);
 
   // Render appropriate phase
   if (game.status === 'lobby') {
     return (
-      <Lobby
-        game={game}
-        players={players}
-        currentPlayer={currentPlayer}
-        gameCode={gameCode}
-      />
+      <Lobby game={game} players={players} currentPlayer={currentPlayer} gameCode={gameCode} />
     );
   }
 
@@ -96,6 +143,7 @@ export default function GameClient({
         players={players}
         submissions={submissions}
         gameCode={gameCode}
+        currentPlayer={currentPlayer}
       />
     );
   }

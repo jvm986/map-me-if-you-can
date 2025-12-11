@@ -1,4 +1,4 @@
-# 🗺️ Map Me If You Can
+# Map Me If You Can
 
 A fun browser-based party game for remote teams! Players upload travel photos with locations, then guess where each photo was taken and who took it. Perfect for 10-15 minute team energizers.
 

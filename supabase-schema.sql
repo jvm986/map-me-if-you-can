@@ -89,6 +89,13 @@ CREATE POLICY "Allow public read access on guesses" ON guesses FOR SELECT USING 
 CREATE POLICY "Allow public insert on guesses" ON guesses FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public update on guesses" ON guesses FOR UPDATE USING (true);
 
+-- Enable Realtime for all tables
+-- This allows clients to subscribe to database changes via WebSockets
+ALTER PUBLICATION supabase_realtime ADD TABLE games;
+ALTER PUBLICATION supabase_realtime ADD TABLE players;
+ALTER PUBLICATION supabase_realtime ADD TABLE photo_submissions;
+ALTER PUBLICATION supabase_realtime ADD TABLE guesses;
+
 -- Create storage bucket for photo uploads
 -- Run this separately in the Supabase Storage UI or via SQL:
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('game-photos', 'game-photos', true);

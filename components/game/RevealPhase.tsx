@@ -1,13 +1,13 @@
 'use client';
 
+import { AdvancedMarker, APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
 import { useState } from 'react';
-import { Game, Player, PhotoSubmission, Guess } from '@/types/game';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { nextPhoto } from '@/lib/game-actions';
-import { toast } from 'sonner';
-import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { Game, Guess, PhotoSubmission, Player } from '@/types/game';
+import PlayerAvatar from '../shared/PlayerAvatar';
 
 interface RevealPhaseProps {
   game: Game;
@@ -17,6 +17,7 @@ interface RevealPhaseProps {
   isHost: boolean;
   gameCode: string;
   onContinue: () => void;
+  submissions: PhotoSubmission[];
 }
 
 export default function RevealPhase({
@@ -26,6 +27,7 @@ export default function RevealPhase({
   guesses,
   isHost,
   gameCode,
+  submissions,
 }: RevealPhaseProps) {
   const [isAdvancing, setIsAdvancing] = useState(false);
 
@@ -36,14 +38,15 @@ export default function RevealPhase({
     setIsAdvancing(true);
     try {
       const result = await nextPhoto(gameCode);
-      if (!result.success) {
-        toast.error(result.error || 'Failed to advance');
+      if (result.success) {
+        // Don't reset isAdvancing - let component unmount when phase/photo changes
+        // This keeps the button disabled until the state actually updates
+      } else {
+        setIsAdvancing(false); // Only reset on error
       }
     } catch (error) {
-      toast.error('An unexpected error occurred');
       console.error(error);
-    } finally {
-      setIsAdvancing(false);
+      setIsAdvancing(false); // Only reset on error
     }
   };
 
@@ -56,7 +59,7 @@ export default function RevealPhase({
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            🎊 Results - Round {game.current_photo_index + 1}
+            Results - Round {game.current_photo_index + 1}
           </h1>
           <p className="text-lg text-gray-600">See how close everyone got!</p>
         </div>
@@ -68,31 +71,29 @@ export default function RevealPhase({
               <CardTitle>The Photo</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg overflow-hidden border mb-4">
-                <img
+              <div
+                className="rounded-lg overflow-hidden border mb-4 bg-gray-100 flex items-center justify-center relative"
+                style={{ minHeight: '256px', height: '256px' }}
+              >
+                <Image
                   src={currentPhoto.image_url}
                   alt="Revealed location"
-                  className="w-full h-64 object-cover"
+                  fill
+                  className="object-contain"
                 />
               </div>
               {currentPhoto.caption && (
-                <p className="text-center italic text-gray-700 mb-4">
-                  "{currentPhoto.caption}"
-                </p>
+                <p className="text-center italic text-gray-700 mb-4">`&quot;`{currentPhoto.caption}`&quot;`</p>
               )}
               <div className="bg-blue-50 p-4 rounded-lg">
-                <p className="text-sm font-medium text-gray-700 mb-2">
-                  📍 Actual Location
-                </p>
+                <p className="text-sm font-medium text-gray-700 mb-2">Actual Location</p>
                 <p className="text-sm text-gray-600">
                   {currentPhoto.true_lat.toFixed(4)}, {currentPhoto.true_lng.toFixed(4)}
                   {currentPhoto.true_location_text && ` (${currentPhoto.true_location_text})`}
                 </p>
-                <p className="text-sm font-medium text-gray-700 mt-3 mb-1">
-                  📸 Taken by
-                </p>
+                <p className="text-sm font-medium text-gray-700 mt-3 mb-1">Taken by</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{photoOwner?.avatar_emoji || '👤'}</span>
+                  {photoOwner && <PlayerAvatar displayName={photoOwner.display_name} size="sm" />}
                   <span className="font-medium">{photoOwner?.display_name}</span>
                 </div>
               </div>
@@ -107,7 +108,7 @@ export default function RevealPhase({
             <CardContent>
               <div className="h-96 rounded-lg overflow-hidden border">
                 <APIProvider apiKey={apiKey}>
-                  <Map
+                  <GoogleMap
                     mapId="reveal-map"
                     defaultCenter={{
                       lat: currentPhoto.true_lat,
@@ -117,21 +118,43 @@ export default function RevealPhase({
                     gestureHandling="greedy"
                     style={{ width: '100%', height: '100%' }}
                   >
-                    {/* Actual location marker (red/special) */}
+                    {/* Actual location marker (red pin) */}
                     <AdvancedMarker
                       position={{
                         lat: currentPhoto.true_lat,
                         lng: currentPhoto.true_lng,
                       }}
                     >
-                      <div className="bg-red-500 text-white px-2 py-1 rounded font-bold text-sm shadow-lg">
-                        ⭐ Actual
-                      </div>
+                      <svg
+                        width="32"
+                        height="48"
+                        viewBox="0 0 32 48"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="drop-shadow-lg"
+                      >
+                        <path
+                          d="M16 0C7.163 0 0 7.163 0 16c0 8.837 16 32 16 32s16-23.163 16-32c0-8.837-7.163-16-16-16z"
+                          fill="#DC2626"
+                        />
+                        <circle cx="16" cy="16" r="8" fill="white" />
+                        <text
+                          x="16"
+                          y="20"
+                          fontSize="12"
+                          fontWeight="bold"
+                          textAnchor="middle"
+                          fill="#DC2626"
+                        >
+                          ★
+                        </text>
+                      </svg>
                     </AdvancedMarker>
 
-                    {/* Guess markers */}
+                    {/* Guess markers (blue pins) */}
                     {guesses.map((guess) => {
                       const guesser = players.find((p) => p.id === guess.player_id);
+                      const initial = guesser?.display_name?.charAt(0).toUpperCase() || '?';
                       return (
                         <AdvancedMarker
                           key={guess.id}
@@ -140,13 +163,34 @@ export default function RevealPhase({
                             lng: guess.guessed_lng,
                           }}
                         >
-                          <div className="bg-blue-500 text-white px-2 py-1 rounded text-xs shadow-lg">
-                            {guesser?.avatar_emoji || '📍'}
-                          </div>
+                          <svg
+                            width="28"
+                            height="42"
+                            viewBox="0 0 32 48"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="drop-shadow-lg"
+                          >
+                            <path
+                              d="M16 0C7.163 0 0 7.163 0 16c0 8.837 16 32 16 32s16-23.163 16-32c0-8.837-7.163-16-16-16z"
+                              fill="#3B82F6"
+                            />
+                            <circle cx="16" cy="16" r="8" fill="white" />
+                            <text
+                              x="16"
+                              y="21"
+                              fontSize="10"
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              fill="#3B82F6"
+                            >
+                              {initial}
+                            </text>
+                          </svg>
                         </AdvancedMarker>
                       );
                     })}
-                  </Map>
+                  </GoogleMap>
                 </APIProvider>
               </div>
             </CardContent>
@@ -162,8 +206,6 @@ export default function RevealPhase({
             <div className="space-y-3">
               {sortedGuesses.map((guess, index) => {
                 const guesser = players.find((p) => p.id === guess.player_id);
-                const guessedOwner = players.find((p) => p.id === guess.guessed_owner_id);
-                const correctOwner = guess.guessed_owner_id === currentPhoto.player_id;
 
                 return (
                   <div
@@ -171,33 +213,20 @@ export default function RevealPhase({
                     className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
                   >
                     <div className="flex items-center gap-4">
-                      <span className="font-bold text-xl text-gray-500 w-8">
-                        #{index + 1}
-                      </span>
+                      <span className="font-bold text-xl text-gray-500 w-8">#{index + 1}</span>
                       <div className="flex items-center gap-2">
-                        <span className="text-2xl">{guesser?.avatar_emoji || '👤'}</span>
+                        {guesser && <PlayerAvatar displayName={guesser.display_name} size="md" />}
                         <div>
                           <p className="font-medium">{guesser?.display_name}</p>
-                          <div className="flex gap-2 text-xs text-gray-600">
-                            <span>
-                              📍 {Math.round(guess.distance_km)}km away
-                            </span>
-                            <span>•</span>
-                            <span>
-                              Guessed: {guessedOwner?.display_name}
-                              {correctOwner ? ' ✓' : ' ✗'}
-                            </span>
-                          </div>
+                          <p className="text-xs text-gray-600">
+                            {Math.round(guess.distance_km)}km away
+                          </p>
                         </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-blue-600">
-                        +{guess.total_score}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {guess.location_score} + {guess.owner_bonus}
-                      </p>
+                      <p className="text-2xl font-bold text-blue-600">+{guess.total_score}</p>
+                      <p className="text-xs text-gray-500">{guess.location_score} pts</p>
                     </div>
                   </div>
                 );
@@ -213,17 +242,12 @@ export default function RevealPhase({
         {isHost && (
           <Card>
             <CardContent className="pt-6">
-              <Button
-                onClick={handleNextPhoto}
-                disabled={isAdvancing}
-                className="w-full"
-                size="lg"
-              >
+              <Button onClick={handleNextPhoto} disabled={isAdvancing} className="w-full" size="lg">
                 {isAdvancing
                   ? 'Loading...'
-                  : game.current_photo_index + 1 >= guesses.length
-                  ? 'View Final Results'
-                  : 'Next Photo'}
+                  : game.current_photo_index + 1 >= submissions.length
+                    ? 'View Final Results'
+                    : 'Next Photo'}
               </Button>
             </CardContent>
           </Card>
@@ -232,9 +256,7 @@ export default function RevealPhase({
         {!isHost && (
           <Card>
             <CardContent className="pt-6">
-              <p className="text-center text-gray-600">
-                Waiting for host to continue...
-              </p>
+              <p className="text-center text-gray-600">Waiting for host to continue...</p>
             </CardContent>
           </Card>
         )}

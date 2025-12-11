@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Game, Player, PhotoSubmission, Location, Guess } from '@/types/game';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { submitGuess, getGuesses, nextPhoto } from '@/lib/game-actions';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getGuesses, submitGuess } from '@/lib/game-actions';
+import { Game, Guess, Location, PhotoSubmission, Player } from '@/types/game';
 import MapPicker from '../shared/MapPicker';
+import PlayerAvatar from '../shared/PlayerAvatar';
 import RevealPhase from './RevealPhase';
 
 interface RoundPhaseProps {
@@ -26,7 +26,6 @@ export default function RoundPhase({
   gameCode,
 }: RoundPhaseProps) {
   const [guessedLocation, setGuessedLocation] = useState<Location | null>(null);
-  const [guessedOwnerId, setGuessedOwnerId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [showReveal, setShowReveal] = useState(false);
@@ -35,29 +34,69 @@ export default function RoundPhase({
   const hasGuessed = guesses.some((g) => g.player_id === currentPlayer?.id);
   const isHost = currentPlayer?.is_host;
 
-  // Fetch guesses for current photo
+  // Calculate eligible guessers (all players except the photo owner)
+  const eligibleGuessers = currentPhoto
+    ? players.filter((p) => p.id !== currentPhoto.player_id)
+    : [];
+  const allEligibleGuessersHaveGuessed =
+    eligibleGuessers.length > 0 &&
+    guesses.length > 0 &&
+    eligibleGuessers.every((p) => guesses.some((g) => g.player_id === p.id));
+
+  // Reset reveal state when photo changes
+  useEffect(() => {
+    setShowReveal(false);
+  }, [currentPhoto?.id]);
+
+  // Fetch and subscribe to guesses for current photo
   useEffect(() => {
     if (currentPhoto) {
       const fetchGuesses = async () => {
         const fetchedGuesses = await getGuesses(currentPhoto.id);
         setGuesses(fetchedGuesses);
       };
+
+      // Initial fetch
       fetchGuesses();
 
-      const interval = setInterval(fetchGuesses, 3000);
-      return () => clearInterval(interval);
+      // Subscribe to realtime updates
+      const supabase = require('@/lib/supabase/client').createClient();
+      const channel = supabase
+        .channel(`guesses-${currentPhoto.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'guesses',
+            filter: `photo_submission_id=eq.${currentPhoto.id}`,
+          },
+          () => {
+            fetchGuesses();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [currentPhoto?.id]);
 
+  // Auto-reveal when all eligible players have guessed
+  useEffect(() => {
+    if (allEligibleGuessersHaveGuessed && !showReveal) {
+      setShowReveal(true);
+    }
+  }, [allEligibleGuessersHaveGuessed, showReveal]);
+
   const handleSubmitGuess = async () => {
-    if (!guessedLocation || !guessedOwnerId || !currentPlayer || !currentPhoto) {
-      toast.error('Please select both a location and a player');
+    if (!guessedLocation || !currentPlayer || !currentPhoto) {
       return;
     }
 
     // Don't allow guessing your own photo
     if (currentPhoto.player_id === currentPlayer.id) {
-      toast.error("You can't guess your own photo!");
       return;
     }
 
@@ -68,29 +107,21 @@ export default function RoundPhase({
         currentPlayer.id,
         guessedLocation.lat,
         guessedLocation.lng,
-        guessedOwnerId,
+        currentPhoto.player_id, // Pass photo owner as guessed owner (not used in scoring anymore)
         currentPhoto.true_lat,
         currentPhoto.true_lng,
         currentPhoto.player_id
       );
 
       if (result.success) {
-        toast.success('Guess submitted!');
         setGuessedLocation(null);
-        setGuessedOwnerId(null);
-      } else {
-        toast.error(result.error || 'Failed to submit guess');
       }
     } catch (error) {
-      toast.error('An unexpected error occurred');
       console.error(error);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Filter players who didn't submit the current photo (for guessing)
-  const guessablePlayers = players.filter((p) => p.id !== currentPhoto?.player_id);
 
   // If all players who can guess have guessed, or host wants to reveal
   if (showReveal || (hasGuessed && isHost)) {
@@ -103,6 +134,7 @@ export default function RoundPhase({
         isHost={isHost || false}
         gameCode={gameCode}
         onContinue={() => setShowReveal(false)}
+        submissions={submissions}
       />
     );
   }
@@ -116,11 +148,9 @@ export default function RoundPhase({
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            🎯 Round {game.current_photo_index + 1} of {submissions.length}
+            Round {game.current_photo_index + 1} of {submissions.length}
           </h1>
-          <p className="text-lg text-gray-600">
-            Guess where this photo was taken and who took it!
-          </p>
+          <p className="text-lg text-gray-600">Guess where this photo was taken!</p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -128,11 +158,14 @@ export default function RoundPhase({
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardContent className="pt-6">
-                <div className="rounded-lg overflow-hidden border mb-4">
+                <div
+                  className="rounded-lg overflow-hidden border mb-4 bg-gray-100 flex items-center justify-center"
+                  style={{ minHeight: '384px' }}
+                >
                   <img
                     src={currentPhoto.image_url}
                     alt="Mystery location"
-                    className="w-full h-96 object-cover"
+                    className="w-full max-h-96 object-contain"
                   />
                 </div>
                 {currentPhoto.caption && (
@@ -152,7 +185,7 @@ export default function RoundPhase({
                   <div className="space-y-6">
                     {/* Map for guessing location */}
                     <div className="space-y-2">
-                      <label className="font-medium">Where was this photo taken?</label>
+                      <p className="font-medium">Where was this photo taken?</p>
                       <div className="h-96 rounded-lg overflow-hidden border">
                         <MapPicker
                           onLocationSelect={setGuessedLocation}
@@ -161,37 +194,15 @@ export default function RoundPhase({
                       </div>
                       {guessedLocation && (
                         <p className="text-sm text-gray-600">
-                          Your guess: {guessedLocation.lat.toFixed(4)}, {guessedLocation.lng.toFixed(4)}
+                          Your guess: {guessedLocation.lat.toFixed(4)},{' '}
+                          {guessedLocation.lng.toFixed(4)}
                         </p>
                       )}
                     </div>
 
-                    {/* Player selection */}
-                    <div className="space-y-2">
-                      <label className="font-medium">Who took this photo?</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {guessablePlayers.map((player) => (
-                          <button
-                            key={player.id}
-                            onClick={() => setGuessedOwnerId(player.id)}
-                            className={`p-3 rounded-lg border-2 transition-all ${
-                              guessedOwnerId === player.id
-                                ? 'border-blue-500 bg-blue-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="text-xl">{player.avatar_emoji || '👤'}</span>
-                              <span className="font-medium">{player.display_name}</span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
                     <Button
                       onClick={handleSubmitGuess}
-                      disabled={isSubmitting || !guessedLocation || !guessedOwnerId}
+                      disabled={isSubmitting || !guessedLocation}
                       className="w-full"
                       size="lg"
                     >
@@ -218,11 +229,8 @@ export default function RoundPhase({
               <Card>
                 <CardContent className="pt-6">
                   <div className="text-center py-8">
-                    <div className="text-6xl mb-4">✅</div>
                     <h3 className="text-2xl font-bold mb-2">Guess Submitted!</h3>
-                    <p className="text-gray-600">
-                      Waiting for other players...
-                    </p>
+                    <p className="text-gray-600">Waiting for other players...</p>
                   </div>
                 </CardContent>
               </Card>
@@ -248,7 +256,7 @@ export default function RoundPhase({
                           className="flex items-center justify-between p-2 bg-gray-50 rounded"
                         >
                           <div className="flex items-center gap-2">
-                            <span>{player.avatar_emoji || '👤'}</span>
+                            <PlayerAvatar displayName={player.display_name} size="sm" />
                             <span className="text-sm">{player.display_name}</span>
                           </div>
                           {hasPlayerGuessed ? (
@@ -303,7 +311,7 @@ export default function RoundPhase({
                       >
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-gray-500 w-6">#{index + 1}</span>
-                          <span>{player.avatar_emoji || '👤'}</span>
+                          <PlayerAvatar displayName={player.display_name} size="sm" />
                           <span className="text-sm">{player.display_name}</span>
                         </div>
                         <span className="font-bold">{player.total_score}</span>

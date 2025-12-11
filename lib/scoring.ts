@@ -43,12 +43,10 @@ export function calculateLocationScore(distanceKm: number): number {
 
 /**
  * Calculate bonus points for guessing the correct photo owner
+ * @deprecated No longer used - owner guessing removed from game
  */
-export function calculateOwnerBonus(
-  guessedOwnerId: string,
-  actualOwnerId: string
-): number {
-  return guessedOwnerId === actualOwnerId ? 2000 : 0;
+export function calculateOwnerBonus(_guessedOwnerId: string, _actualOwnerId: string): number {
+  return 0; // Owner bonus disabled
 }
 
 /**
@@ -56,16 +54,16 @@ export function calculateOwnerBonus(
  */
 export function calculateTotalScore(
   distanceKm: number,
-  guessedOwnerId: string,
-  actualOwnerId: string
+  _guessedOwnerId: string,
+  _actualOwnerId: string
 ): {
   locationScore: number;
   ownerBonus: number;
   totalScore: number;
 } {
   const locationScore = calculateLocationScore(distanceKm);
-  const ownerBonus = calculateOwnerBonus(guessedOwnerId, actualOwnerId);
-  const totalScore = locationScore + ownerBonus;
+  const ownerBonus = 0; // Owner bonus disabled
+  const totalScore = locationScore;
 
   return {
     locationScore,

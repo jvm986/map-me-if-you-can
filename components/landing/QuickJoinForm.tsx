@@ -1,49 +1,43 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { joinGame } from '@/lib/game-actions';
 
-export default function JoinGameForm() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [gameCode, setGameCode] = useState('');
+interface QuickJoinFormProps {
+  gameCode: string;
+}
+
+export default function QuickJoinForm({ gameCode }: QuickJoinFormProps) {
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load game code from URL and player name from localStorage on mount
+  // Load player name from localStorage on mount
   useEffect(() => {
-    const codeFromUrl = searchParams.get('code');
-    if (codeFromUrl) {
-      setGameCode(codeFromUrl.toUpperCase());
-    }
-
     const savedName = localStorage.getItem('player_name');
     if (savedName) {
       setDisplayName(savedName);
     }
-  }, [searchParams]);
+  }, []);
 
   const handleJoinGame = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!gameCode.trim() || !displayName.trim()) {
+    if (!displayName.trim()) {
       return;
     }
 
     setIsLoading(true);
     try {
-      const normalizedCode = gameCode.trim().toUpperCase();
-      const result = await joinGame(normalizedCode, displayName.trim());
+      const result = await joinGame(gameCode, displayName.trim());
 
       if (result.success && result.playerId) {
-        // Store player ID and name in localStorage
-        localStorage.setItem(`player_${normalizedCode}`, result.playerId);
+        localStorage.setItem(`player_${gameCode}`, result.playerId);
         localStorage.setItem('player_name', displayName.trim());
-        router.push(`/game/${normalizedCode}`);
+        // Force full page reload to show the lobby with updated player
+        window.location.reload();
       } else {
         setIsLoading(false);
       }
@@ -56,19 +50,6 @@ export default function JoinGameForm() {
   return (
     <form onSubmit={handleJoinGame} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="gameCode">Game Code</Label>
-        <Input
-          id="gameCode"
-          type="text"
-          placeholder="e.g., A7K2M"
-          value={gameCode}
-          onChange={(e) => setGameCode(e.target.value.toUpperCase())}
-          maxLength={5}
-          required
-        />
-      </div>
-
-      <div className="space-y-2">
         <Label htmlFor="displayName">Your Name</Label>
         <Input
           id="displayName"
@@ -77,11 +58,17 @@ export default function JoinGameForm() {
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={50}
-          required
+          disabled={isLoading}
+          autoFocus
         />
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full" size="lg">
+      <Button
+        type="submit"
+        disabled={isLoading || !displayName.trim()}
+        className="w-full"
+        size="lg"
+      >
         {isLoading ? 'Joining...' : 'Join Game'}
       </Button>
     </form>

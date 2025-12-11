@@ -1,23 +1,21 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
-import { Game, Player, PhotoSubmission, Guess } from '@/types/game';
-import { uniqueNamesGenerator, adjectives, animals, NumberDictionary } from 'unique-names-generator';
-import { calculateDistance, calculateTotalScore } from './scoring';
 import { revalidatePath } from 'next/cache';
-
-const numberDictionary = NumberDictionary.generate({ min: 10, max: 99 });
+import { createClient } from '@/lib/supabase/server';
+import { Game, Guess, PhotoSubmission, Player } from '@/types/game';
+import { calculateDistance, calculateTotalScore } from './scoring';
 
 /**
- * Generate a unique, human-friendly game code like "happy-fox-42"
+ * Generate a simple 5-character alphanumeric game code like "A7K2M"
+ * Uses uppercase letters and numbers for easy sharing over video calls
  */
 function generateGameCode(): string {
-  return uniqueNamesGenerator({
-    dictionaries: [adjectives, animals, numberDictionary],
-    separator: '-',
-    length: 3,
-    style: 'lowerCase',
-  });
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Exclude confusing chars like 0, O, 1, I
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
 }
 
 /**
@@ -28,7 +26,7 @@ export async function createGame(): Promise<{ success: boolean; code?: string; e
     const supabase = await createClient();
     const code = generateGameCode();
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('games')
       .insert({
         code,
@@ -52,8 +50,7 @@ export async function createGame(): Promise<{ success: boolean; code?: string; e
  */
 export async function joinGame(
   gameCode: string,
-  displayName: string,
-  avatarEmoji?: string
+  displayName: string
 ): Promise<{ success: boolean; gameId?: string; playerId?: string; error?: string }> {
   try {
     const supabase = await createClient();
@@ -77,13 +74,13 @@ export async function joinGame(
 
     const isHost = !existingPlayers || existingPlayers.length === 0;
 
-    // Create the player
+    // Create the player (avatar_emoji is now always null)
     const { data: player, error: playerError } = await supabase
       .from('players')
       .insert({
         game_id: game.id,
         display_name: displayName,
-        avatar_emoji: avatarEmoji || null,
+        avatar_emoji: null,
         is_host: isHost,
       })
       .select()
@@ -93,10 +90,7 @@ export async function joinGame(
 
     // If this is the host, update the game
     if (isHost) {
-      await supabase
-        .from('games')
-        .update({ host_player_id: player.id })
-        .eq('id', game.id);
+      await supabase.from('games').update({ host_player_id: player.id }).eq('id', game.id);
     }
 
     revalidatePath(`/game/${gameCode}`);
@@ -151,7 +145,9 @@ export async function getGame(gameCode: string): Promise<{
 /**
  * Start the submission phase (host only)
  */
-export async function startSubmissionPhase(gameCode: string): Promise<{ success: boolean; error?: string }> {
+export async function startSubmissionPhase(
+  gameCode: string
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
 
@@ -184,19 +180,17 @@ export async function uploadPhoto(
     const fileExt = file.name.split('.').pop();
     const fileName = `${gameCode}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-    const { data, error } = await supabase.storage
-      .from('game-photos')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
+    const { error } = await supabase.storage.from('game-photos').upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+    });
 
     if (error) throw error;
 
     // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('game-photos')
-      .getPublicUrl(fileName);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from('game-photos').getPublicUrl(fileName);
 
     return { success: true, url: publicUrl };
   } catch (error) {
@@ -220,17 +214,15 @@ export async function submitPhoto(
   try {
     const supabase = await createClient();
 
-    const { error } = await supabase
-      .from('photo_submissions')
-      .insert({
-        game_id: gameId,
-        player_id: playerId,
-        image_url: imageUrl,
-        caption: caption || null,
-        true_lat: lat,
-        true_lng: lng,
-        true_location_text: locationText || null,
-      });
+    const { error } = await supabase.from('photo_submissions').insert({
+      game_id: gameId,
+      player_id: playerId,
+      image_url: imageUrl,
+      caption: caption || null,
+      true_lat: lat,
+      true_lng: lng,
+      true_location_text: locationText || null,
+    });
 
     if (error) throw error;
 
@@ -267,7 +259,9 @@ export async function getPhotoSubmissions(gameId: string): Promise<PhotoSubmissi
 /**
  * Start playing with current submissions (host only)
  */
-export async function startPlaying(gameCode: string): Promise<{ success: boolean; error?: string }> {
+export async function startPlaying(
+  gameCode: string
+): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
 
@@ -318,19 +312,17 @@ export async function submitGuess(
     );
 
     // Insert guess
-    const { error: guessError } = await supabase
-      .from('guesses')
-      .insert({
-        photo_submission_id: photoSubmissionId,
-        player_id: playerId,
-        guessed_lat: guessedLat,
-        guessed_lng: guessedLng,
-        guessed_owner_id: guessedOwnerId,
-        distance_km: distanceKm,
-        location_score: locationScore,
-        owner_bonus: ownerBonus,
-        total_score: totalScore,
-      });
+    const { error: guessError } = await supabase.from('guesses').insert({
+      photo_submission_id: photoSubmissionId,
+      player_id: playerId,
+      guessed_lat: guessedLat,
+      guessed_lng: guessedLng,
+      guessed_owner_id: guessedOwnerId,
+      distance_km: distanceKm,
+      location_score: locationScore,
+      owner_bonus: ownerBonus,
+      total_score: totalScore,
+    });
 
     if (guessError) throw guessError;
 
@@ -363,9 +355,10 @@ export async function getGuesses(photoSubmissionId: string): Promise<Guess[]> {
   try {
     const supabase = await createClient();
 
+    // Use explicit relationship name to avoid ambiguity between player_id and guessed_owner_id
     const { data, error } = await supabase
       .from('guesses')
-      .select('*, player:players(*)')
+      .select('*, player:players!guesses_player_id_fkey(*)')
       .eq('photo_submission_id', photoSubmissionId)
       .order('total_score', { ascending: false });
 
@@ -404,15 +397,9 @@ export async function nextPhoto(gameCode: string): Promise<{ success: boolean; e
 
     // Check if we've finished all photos
     if (nextIndex >= (submissions?.length || 0)) {
-      await supabase
-        .from('games')
-        .update({ status: 'finished' })
-        .eq('code', gameCode);
+      await supabase.from('games').update({ status: 'finished' }).eq('code', gameCode);
     } else {
-      await supabase
-        .from('games')
-        .update({ current_photo_index: nextIndex })
-        .eq('code', gameCode);
+      await supabase.from('games').update({ current_photo_index: nextIndex }).eq('code', gameCode);
     }
 
     revalidatePath(`/game/${gameCode}`);
@@ -420,5 +407,48 @@ export async function nextPhoto(gameCode: string): Promise<{ success: boolean; e
   } catch (error) {
     console.error('Error moving to next photo:', error);
     return { success: false, error: 'Failed to move to next photo' };
+  }
+}
+
+export async function restartGame(gameCode: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // Get game id
+    const { data: game } = await supabase.from('games').select('id').eq('code', gameCode).single();
+
+    if (!game) throw new Error('Game not found');
+
+    // Delete all guesses for this game's photo submissions
+    const { data: submissions } = await supabase
+      .from('photo_submissions')
+      .select('id')
+      .eq('game_id', game.id);
+
+    if (submissions) {
+      const submissionIds = submissions.map((s) => s.id);
+      await supabase.from('guesses').delete().in('photo_submission_id', submissionIds);
+    }
+
+    // Delete all photo submissions
+    await supabase.from('photo_submissions').delete().eq('game_id', game.id);
+
+    // Reset player scores
+    await supabase.from('players').update({ total_score: 0 }).eq('game_id', game.id);
+
+    // Reset game state to submission phase
+    await supabase
+      .from('games')
+      .update({
+        status: 'submission',
+        current_photo_index: 0,
+      })
+      .eq('code', gameCode);
+
+    revalidatePath(`/game/${gameCode}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error restarting game:', error);
+    return { success: false, error: 'Failed to restart game' };
   }
 }
