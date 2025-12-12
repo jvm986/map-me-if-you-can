@@ -1,8 +1,8 @@
 'use client';
 
 import { AdvancedMarker, APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
-import { useState } from 'react';
 import Image from 'next/image';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { nextPhoto } from '@/lib/game-actions';

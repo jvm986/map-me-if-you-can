@@ -1,8 +1,8 @@
 'use client';
 
 import { parse as parseExif } from 'exifr';
-import { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
