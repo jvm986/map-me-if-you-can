@@ -10,6 +10,7 @@ import { createGame, joinGame } from '@/lib/game-actions';
 export default function UnifiedGameForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [mounted, setMounted] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [gameCode, setGameCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
@@ -19,7 +20,6 @@ export default function UnifiedGameForm() {
   useEffect(() => {
     const codeFromUrl = searchParams.get('code');
     if (codeFromUrl) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGameCode(codeFromUrl.toUpperCase());
     }
 
@@ -27,7 +27,8 @@ export default function UnifiedGameForm() {
     if (savedName) {
       setDisplayName(savedName);
     }
-    // This effect intentionally syncs with external systems (localStorage, URL params) on mount
+
+    setMounted(true);
   }, [searchParams]);
 
   const handleJoinGame = async (e: React.FormEvent) => {
@@ -85,6 +86,36 @@ export default function UnifiedGameForm() {
       setIsCreating(false);
     }
   };
+
+  // Show loading skeleton during hydration to prevent mismatch
+  if (!mounted) {
+    return (
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <div className="h-5 w-24 bg-gray-200 rounded animate-pulse" />
+          <div className="h-10 w-full bg-gray-100 rounded animate-pulse" />
+        </div>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <div className="h-5 w-24 bg-gray-200 rounded animate-pulse" />
+            <div className="flex gap-2">
+              <div className="flex-1 h-10 bg-gray-100 rounded animate-pulse" />
+              <div className="h-10 w-20 bg-gray-100 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-200"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-white px-2 text-gray-500">or</span>
+          </div>
+        </div>
+        <div className="h-10 w-full bg-gray-100 rounded animate-pulse" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

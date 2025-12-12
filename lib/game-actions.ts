@@ -208,7 +208,6 @@ export async function submitPhoto(
   imageUrl: string,
   lat: number,
   lng: number,
-  caption?: string,
   locationText?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -218,7 +217,6 @@ export async function submitPhoto(
       game_id: gameId,
       player_id: playerId,
       image_url: imageUrl,
-      caption: caption || null,
       true_lat: lat,
       true_lng: lng,
       true_location_text: locationText || null,
@@ -326,20 +324,6 @@ export async function submitGuess(
 
     if (guessError) throw guessError;
 
-    // Update player's total score
-    const { data: player } = await supabase
-      .from('players')
-      .select('total_score')
-      .eq('id', playerId)
-      .single();
-
-    if (player) {
-      await supabase
-        .from('players')
-        .update({ total_score: player.total_score + totalScore })
-        .eq('id', playerId);
-    }
-
     revalidatePath(`/game/*`);
     return { success: true };
   } catch (error) {
@@ -368,6 +352,54 @@ export async function getGuesses(photoSubmissionId: string): Promise<Guess[]> {
   } catch (error) {
     console.error('Error fetching guesses:', error);
     return [];
+  }
+}
+
+/**
+ * Reveal results and update scores for the current round
+ * Uses score_applied flag to prevent duplicate score updates
+ */
+export async function revealResults(
+  gameCode: string,
+  currentPhotoId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // Get all guesses for the current photo that haven't had scores applied yet
+    const { data: guesses } = await supabase
+      .from('guesses')
+      .select('id, player_id, total_score, score_applied')
+      .eq('photo_submission_id', currentPhotoId)
+      .eq('score_applied', false);
+
+    // Update each player's total score
+    if (guesses && guesses.length > 0) {
+      for (const guess of guesses) {
+        const { data: player } = await supabase
+          .from('players')
+          .select('total_score')
+          .eq('id', guess.player_id)
+          .single();
+
+        if (player) {
+          // Update player's total score
+          await supabase
+            .from('players')
+            .update({ total_score: player.total_score + guess.total_score })
+            .eq('id', guess.player_id);
+
+          // Mark this guess as score_applied
+          await supabase.from('guesses').update({ score_applied: true }).eq('id', guess.id);
+        }
+      }
+    }
+
+    revalidatePath(`/game/${gameCode}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error revealing results:', error);
+    return { success: false, error: 'Failed to reveal results' };
   }
 }
 

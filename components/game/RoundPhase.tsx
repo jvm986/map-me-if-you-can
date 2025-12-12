@@ -1,10 +1,10 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getGuesses, submitGuess } from '@/lib/game-actions';
+import { getGuesses, revealResults, submitGuess } from '@/lib/game-actions';
 import { Game, Guess, Location, PhotoSubmission, Player } from '@/types/game';
 import MapPicker from '../shared/MapPicker';
 import PlayerAvatar from '../shared/PlayerAvatar';
@@ -29,6 +29,7 @@ export default function RoundPhase({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [showReveal, setShowReveal] = useState(false);
+  const [isRevealing, setIsRevealing] = useState(false);
 
   const currentPhoto = submissions[game.current_photo_index];
   const hasGuessed = guesses.some((g) => g.player_id === currentPlayer?.id);
@@ -43,9 +44,11 @@ export default function RoundPhase({
     guesses.length > 0 &&
     eligibleGuessers.every((p) => guesses.some((g) => g.player_id === p.id));
 
-  // Reset reveal state when photo changes
+  // Reset reveal state and guesses when photo changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: We want to reset when photo changes
   useEffect(() => {
     setShowReveal(false);
+    setGuesses([]);
   }, [currentPhoto?.id]);
 
   // Fetch and subscribe to guesses for current photo
@@ -81,14 +84,18 @@ export default function RoundPhase({
         supabase.removeChannel(channel);
       };
     }
-  }, [currentPhoto?.id]);
+  }, [currentPhoto]);
 
   // Auto-reveal when all eligible players have guessed
   useEffect(() => {
-    if (allEligibleGuessersHaveGuessed && !showReveal) {
-      setShowReveal(true);
+    if (allEligibleGuessersHaveGuessed && !showReveal && currentPhoto) {
+      const doReveal = async () => {
+        await revealResults(gameCode, currentPhoto.id);
+        setShowReveal(true);
+      };
+      doReveal();
     }
-  }, [allEligibleGuessersHaveGuessed, showReveal]);
+  }, [allEligibleGuessersHaveGuessed, showReveal, currentPhoto, gameCode]);
 
   const handleSubmitGuess = async () => {
     if (!guessedLocation || !currentPlayer || !currentPhoto) {
@@ -123,6 +130,20 @@ export default function RoundPhase({
     }
   };
 
+  const handleReveal = async () => {
+    if (!currentPhoto) return;
+
+    setIsRevealing(true);
+    try {
+      await revealResults(gameCode, currentPhoto.id);
+      setShowReveal(true);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsRevealing(false);
+    }
+  };
+
   // If all players who can guess have guessed, or host wants to reveal
   if (showReveal || (hasGuessed && isHost)) {
     return (
@@ -150,7 +171,13 @@ export default function RoundPhase({
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Round {game.current_photo_index + 1} of {submissions.length}
           </h1>
-          <p className="text-lg text-gray-600">Guess where this photo was taken!</p>
+          <p className="text-lg text-gray-600">
+            {isOwnPhoto
+              ? 'This is your photo! Waiting for others to guess...'
+              : hasGuessed
+                ? 'Guess submitted! Waiting for other players...'
+                : 'Guess where this photo was taken!'}
+          </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
@@ -159,20 +186,16 @@ export default function RoundPhase({
             <Card>
               <CardContent className="pt-6">
                 <div
-                  className="rounded-lg overflow-hidden border mb-4 bg-gray-100 flex items-center justify-center"
-                  style={{ minHeight: '384px' }}
+                  className="rounded-lg overflow-hidden border mb-4 bg-gray-100 flex items-center justify-center relative"
+                  style={{ minHeight: '384px', height: '384px' }}
                 >
-                  <img
+                  <Image
                     src={currentPhoto.image_url}
                     alt="Mystery location"
-                    className="w-full max-h-96 object-contain"
+                    fill
+                    className="object-contain"
                   />
                 </div>
-                {currentPhoto.caption && (
-                  <p className="text-center text-lg italic text-gray-700">
-                    "{currentPhoto.caption}"
-                  </p>
-                )}
               </CardContent>
             </Card>
 
@@ -185,19 +208,12 @@ export default function RoundPhase({
                   <div className="space-y-6">
                     {/* Map for guessing location */}
                     <div className="space-y-2">
-                      <p className="font-medium">Where was this photo taken?</p>
                       <div className="h-96 rounded-lg overflow-hidden border">
                         <MapPicker
                           onLocationSelect={setGuessedLocation}
                           selectedLocation={guessedLocation}
                         />
                       </div>
-                      {guessedLocation && (
-                        <p className="text-sm text-gray-600">
-                          Your guess: {guessedLocation.lat.toFixed(4)},{' '}
-                          {guessedLocation.lng.toFixed(4)}
-                        </p>
-                      )}
                     </div>
 
                     <Button
@@ -212,89 +228,10 @@ export default function RoundPhase({
                 </CardContent>
               </Card>
             )}
-
-            {isOwnPhoto && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <p className="text-lg text-gray-600">
-                      This is your photo! Waiting for others to guess...
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {hasGuessed && !isOwnPhoto && (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-8">
-                    <h3 className="text-2xl font-bold mb-2">Guess Submitted!</h3>
-                    <p className="text-gray-600">Waiting for other players...</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Guess Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Guess Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {players
-                    .filter((p) => p.id !== currentPhoto?.player_id)
-                    .map((player) => {
-                      const hasPlayerGuessed = guesses.some((g) => g.player_id === player.id);
-                      return (
-                        <div
-                          key={player.id}
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                        >
-                          <div className="flex items-center gap-2">
-                            <PlayerAvatar displayName={player.display_name} size="sm" />
-                            <span className="text-sm">{player.display_name}</span>
-                          </div>
-                          {hasPlayerGuessed ? (
-                            <Badge variant="default">✓</Badge>
-                          ) : (
-                            <Badge variant="outline">Guessing</Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Host Controls */}
-            {isHost && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Host Controls</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Reveal results when ready (at least 2 guesses recommended).
-                  </p>
-                  <Button
-                    onClick={() => setShowReveal(true)}
-                    disabled={guesses.length < 1}
-                    className="w-full"
-                  >
-                    Reveal Results
-                  </Button>
-                  <p className="text-xs text-center text-gray-500">
-                    {guesses.length} guess{guesses.length !== 1 ? 'es' : ''} so far
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-
             {/* Leaderboard */}
             <Card>
               <CardHeader>
@@ -309,17 +246,40 @@ export default function RoundPhase({
                         key={player.id}
                         className="flex items-center justify-between p-2 bg-gray-50 rounded"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-gray-500 w-6">#{index + 1}</span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="font-bold text-gray-500 w-6 flex-shrink-0">
+                            #{index + 1}
+                          </span>
                           <PlayerAvatar displayName={player.display_name} size="sm" />
-                          <span className="text-sm">{player.display_name}</span>
+                          <span className="text-sm truncate">{player.display_name}</span>
                         </div>
-                        <span className="font-bold">{player.total_score}</span>
+                        <span className="font-bold text-sm">{player.total_score}</span>
                       </div>
                     ))}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Host Controls */}
+            {isHost && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Host Controls</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button
+                    onClick={handleReveal}
+                    disabled={isRevealing || guesses.length < 1}
+                    className="w-full"
+                  >
+                    {isRevealing ? 'Revealing...' : 'Reveal Results'}
+                  </Button>
+                  <p className="text-xs text-center text-gray-500">
+                    {guesses.length}/{eligibleGuessers.length} guesses submitted
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
