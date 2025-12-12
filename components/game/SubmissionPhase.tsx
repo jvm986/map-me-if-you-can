@@ -1,14 +1,15 @@
 'use client';
 
 import { parse as parseExif } from 'exifr';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { startPlaying, submitPhoto, uploadPhoto } from '@/lib/game-actions';
-import { resampleImage } from '@/lib/image-utils';
+import { resampleImageWithFallback } from '@/lib/image-utils';
 import { Game, Location, PhotoSubmission, Player } from '@/types/game';
 import MapPicker from '../shared/MapPicker';
 import PlayerAvatar from '../shared/PlayerAvatar';
@@ -28,24 +29,46 @@ export default function SubmissionPhase({
   currentPlayer,
   gameCode,
 }: SubmissionPhaseProps) {
+  const [mounted, setMounted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [caption, setCaption] = useState('');
   const [location, setLocation] = useState<Location | null>(null);
   const [exifLocation, setExifLocation] = useState<Location | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const hasSubmitted = submissions.some((s) => s.player_id === currentPlayer?.id);
   const isHost = currentPlayer?.is_host;
+
+  // Track mount status to prevent hydration errors
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Cleanup preview URL on unmount or when it changes
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset location state for new file
+    // Clear previous state
     setLocation(null);
     setExifLocation(null);
+    setIsProcessing(true);
+
+    // Revoke old preview URL if exists
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
 
     try {
       // Try to extract GPS location from EXIF data before resampling
@@ -60,20 +83,31 @@ export default function SubmissionPhase({
           setExifLocation(extractedLocation);
           setLocation(extractedLocation);
         }
-      } catch (error) {
+      } catch (exifError) {
         // EXIF extraction failed or no GPS data - user will need to select manually
-        console.log('No GPS data in photo:', error);
+        console.log('No GPS data in photo:', exifError);
       }
 
-      // Resample image if it's too large (>1MB)
-      const resampledFile = await resampleImage(file);
+      // Resample image with fallback for mobile compatibility
+      const resampledFile = await resampleImageWithFallback(file);
 
       setSelectedFile(resampledFile);
       // Create preview URL
       const url = URL.createObjectURL(resampledFile);
       setPreviewUrl(url);
+      toast.success('Image processed successfully!');
     } catch (error) {
       console.error('Error processing image:', error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to process image. Please try a different photo.';
+      toast.error(errorMessage);
+      setSelectedFile(null);
+      // Reset file input
+      e.target.value = '';
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -89,6 +123,7 @@ export default function SubmissionPhase({
       // Upload photo
       const uploadResult = await uploadPhoto(selectedFile, gameCode);
       if (!uploadResult.success || !uploadResult.url) {
+        toast.error(uploadResult.error || 'Failed to upload photo. Please try again.');
         setIsSubmitting(false);
         return;
       }
@@ -99,20 +134,22 @@ export default function SubmissionPhase({
         currentPlayer.id,
         uploadResult.url,
         location.lat,
-        location.lng,
-        caption || undefined
+        location.lng
       );
 
       if (submitResult.success) {
+        toast.success('Photo submitted successfully!');
         // Clear form
         setSelectedFile(null);
         setPreviewUrl(null);
-        setCaption('');
         setLocation(null);
         setExifLocation(null);
+      } else {
+        toast.error(submitResult.error || 'Failed to submit photo. Please try again.');
       }
     } catch (error) {
       console.error(error);
+      toast.error('An unexpected error occurred. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -140,18 +177,41 @@ export default function SubmissionPhase({
 
   const mySubmission = submissions.find((s) => s.player_id === currentPlayer?.id);
 
+  // Show loading state during hydration to prevent mismatch
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div className="max-w-4xl mx-auto py-8">
+          <div className="text-center mb-8">
+            <div className="h-10 w-64 bg-gray-200 rounded animate-pulse mx-auto mb-2" />
+            <div className="h-6 w-96 bg-gray-200 rounded animate-pulse mx-auto" />
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="md:col-span-2">
+              <div className="h-96 bg-gray-100 rounded-lg animate-pulse" />
+            </div>
+            <div className="space-y-6">
+              <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
+              <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto py-8">
+      <div className="max-w-6xl mx-auto py-8">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Your Photo</h1>
           <p className="text-lg text-gray-600">Upload a travel photo and mark where it was taken</p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-3 gap-6">
           {/* Submission Form */}
-          <div className="md:col-span-2">
+          <div className="lg:col-span-2">
             {!hasSubmitted ? (
               <Card>
                 <CardHeader>
@@ -167,20 +227,12 @@ export default function SubmissionPhase({
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
+                        disabled={isProcessing}
                         required
                       />
-                    </div>
-
-                    {/* Caption */}
-                    <div className="space-y-2">
-                      <Label htmlFor="caption">Caption (Optional)</Label>
-                      <Input
-                        id="caption"
-                        type="text"
-                        placeholder="e.g., Breakfast somewhere sunny..."
-                        value={caption}
-                        onChange={(e) => setCaption(e.target.value)}
-                      />
+                      {isProcessing && (
+                        <p className="text-sm text-blue-600">Processing image...</p>
+                      )}
                     </div>
 
                     {/* Map Picker */}
@@ -203,21 +255,41 @@ export default function SubmissionPhase({
 
                     <Button
                       type="submit"
-                      disabled={isSubmitting || !selectedFile || !location}
+                      disabled={isSubmitting || isProcessing || !selectedFile || !location}
                       className="w-full"
                       size="lg"
                     >
-                      {isSubmitting ? 'Submitting...' : 'Submit Photo'}
+                      {isSubmitting
+                        ? 'Submitting...'
+                        : isProcessing
+                          ? 'Processing...'
+                          : 'Submit Photo'}
                     </Button>
                   </form>
                 </CardContent>
               </Card>
             ) : (
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-12">
-                    <h3 className="text-2xl font-bold mb-2">Photo Submitted!</h3>
-                    <p className="text-gray-600 mb-6">
+              <div className="relative h-96 rounded-lg overflow-hidden shadow-lg">
+                {/* Background Image - fills frame completely */}
+                {mySubmission?.image_url && (
+                  <>
+                    <img
+                      src={mySubmission.image_url}
+                      alt="Your submitted travel location"
+                      className="w-full h-full object-cover"
+                    />
+                    {/* Dark overlay for text readability */}
+                    <div className="absolute inset-0 bg-black/50" />
+                  </>
+                )}
+
+                {/* Text Content Overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
+                  <div className="bg-white/95 backdrop-blur-sm rounded-lg p-8 shadow-xl max-w-md">
+                    <h3 className="text-3xl font-bold mb-3 text-gray-900">
+                      Photo Submitted! ✓
+                    </h3>
+                    <p className="text-gray-600">
                       {submissions.length === players.length
                         ? isHost
                           ? 'All players have submitted! Click Start Game to start playing.'
@@ -225,15 +297,15 @@ export default function SubmissionPhase({
                         : 'Waiting for other players to submit their photos...'}
                     </p>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Photo Preview */}
-            {(previewUrl || mySubmission) && (
+            {/* Photo Preview - only show during upload, not after submission */}
+            {previewUrl && !hasSubmitted && (
               <Card>
                 <CardHeader>
                   <CardTitle>Your Photo</CardTitle>
@@ -244,16 +316,11 @@ export default function SubmissionPhase({
                     style={{ minHeight: '200px' }}
                   >
                     <img
-                      src={previewUrl || mySubmission?.image_url}
+                      src={previewUrl}
                       alt="Your travel submission"
                       className="w-full max-h-64 object-contain"
                     />
                   </div>
-                  {mySubmission?.caption && (
-                    <p className="text-sm text-gray-600 mt-2 text-center italic">
-                      `&quot;`{mySubmission.caption}`&quot;`
-                    </p>
-                  )}
                 </CardContent>
               </Card>
             )}
@@ -286,11 +353,6 @@ export default function SubmissionPhase({
                     );
                   })}
                 </div>
-                <div className="mt-4 pt-4 border-t">
-                  <p className="text-sm font-medium text-center">
-                    {submissions.length} of {players.length} submitted
-                  </p>
-                </div>
               </CardContent>
             </Card>
 
@@ -301,9 +363,6 @@ export default function SubmissionPhase({
                   <CardTitle>Host Controls</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    Start the game when enough players have submitted photos (at least 2).
-                  </p>
                   <Button
                     onClick={handleStartPlaying}
                     disabled={isStarting || submissions.length < 2}
@@ -311,11 +370,9 @@ export default function SubmissionPhase({
                   >
                     {isStarting ? 'Starting...' : 'Start Game'}
                   </Button>
-                  {submissions.length < 2 && (
-                    <p className="text-xs text-amber-600 text-center">
-                      Need at least 2 submissions
-                    </p>
-                  )}
+                  <p className="text-xs text-center text-gray-500">
+                    {submissions.length} of {players.length} submitted
+                  </p>
                 </CardContent>
               </Card>
             )}

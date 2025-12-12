@@ -26,7 +26,6 @@ export interface PhotoSubmission {
   game_id: string;
   player_id: string;
   image_url: string;
-  caption: string | null;
   true_lat: number;
   true_lng: number;
   true_location_text: string | null;

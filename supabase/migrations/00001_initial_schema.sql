@@ -1,5 +1,5 @@
 -- Map Me If You Can Database Schema
--- Run this in your Supabase SQL editor to set up the database
+-- Initial schema with all tables
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -31,7 +31,6 @@ CREATE TABLE photo_submissions (
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
   player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   image_url TEXT NOT NULL,
-  caption TEXT,
   true_lat DOUBLE PRECISION NOT NULL,
   true_lng DOUBLE PRECISION NOT NULL,
   true_location_text TEXT,
@@ -50,6 +49,7 @@ CREATE TABLE guesses (
   location_score INTEGER NOT NULL,
   owner_bonus INTEGER NOT NULL,
   total_score INTEGER NOT NULL,
+  score_applied BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(photo_submission_id, player_id)
 );
@@ -64,6 +64,7 @@ CREATE INDEX idx_photo_submissions_game_id ON photo_submissions(game_id);
 CREATE INDEX idx_guesses_photo_submission_id ON guesses(photo_submission_id);
 CREATE INDEX idx_guesses_player_id ON guesses(player_id);
 CREATE INDEX idx_games_code ON games(code);
+CREATE INDEX idx_guesses_score_applied ON guesses(score_applied);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE games ENABLE ROW LEVEL SECURITY;
