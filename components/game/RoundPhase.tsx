@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getGuesses, revealResults, submitGuess } from '@/lib/game-actions';
@@ -43,9 +44,11 @@ export default function RoundPhase({
     guesses.length > 0 &&
     eligibleGuessers.every((p) => guesses.some((g) => g.player_id === p.id));
 
-  // Reset reveal state when photo changes
+  // Reset reveal state and guesses when photo changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: We want to reset when photo changes
   useEffect(() => {
     setShowReveal(false);
+    setGuesses([]);
   }, [currentPhoto?.id]);
 
   // Fetch and subscribe to guesses for current photo
@@ -81,7 +84,7 @@ export default function RoundPhase({
         supabase.removeChannel(channel);
       };
     }
-  }, [currentPhoto?.id]);
+  }, [currentPhoto]);
 
   // Auto-reveal when all eligible players have guessed
   useEffect(() => {
@@ -183,13 +186,14 @@ export default function RoundPhase({
             <Card>
               <CardContent className="pt-6">
                 <div
-                  className="rounded-lg overflow-hidden border mb-4 bg-gray-100 flex items-center justify-center"
-                  style={{ minHeight: '384px' }}
+                  className="rounded-lg overflow-hidden border mb-4 bg-gray-100 flex items-center justify-center relative"
+                  style={{ minHeight: '384px', height: '384px' }}
                 >
-                  <img
+                  <Image
                     src={currentPhoto.image_url}
                     alt="Mystery location"
-                    className="w-full max-h-96 object-contain"
+                    fill
+                    className="object-contain"
                   />
                 </div>
               </CardContent>

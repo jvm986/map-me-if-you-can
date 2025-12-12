@@ -2,6 +2,7 @@
 
 import { parse as parseExif } from 'exifr';
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -230,9 +231,7 @@ export default function SubmissionPhase({
                         disabled={isProcessing}
                         required
                       />
-                      {isProcessing && (
-                        <p className="text-sm text-blue-600">Processing image...</p>
-                      )}
+                      {isProcessing && <p className="text-sm text-blue-600">Processing image...</p>}
                     </div>
 
                     {/* Map Picker */}
@@ -273,10 +272,11 @@ export default function SubmissionPhase({
                 {/* Background Image - fills frame completely */}
                 {mySubmission?.image_url && (
                   <>
-                    <img
+                    <Image
                       src={mySubmission.image_url}
-                      alt="Your submitted travel location"
-                      className="w-full h-full object-cover"
+                      alt="Your submitted location"
+                      fill
+                      className="object-cover"
                     />
                     {/* Dark overlay for text readability */}
                     <div className="absolute inset-0 bg-black/50" />
@@ -286,9 +286,7 @@ export default function SubmissionPhase({
                 {/* Text Content Overlay */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
                   <div className="bg-white/95 backdrop-blur-sm rounded-lg p-8 shadow-xl max-w-md">
-                    <h3 className="text-3xl font-bold mb-3 text-gray-900">
-                      Photo Submitted! ✓
-                    </h3>
+                    <h3 className="text-3xl font-bold mb-3 text-gray-900">Photo Submitted! ✓</h3>
                     <p className="text-gray-600">
                       {submissions.length === players.length
                         ? isHost
@@ -312,13 +310,14 @@ export default function SubmissionPhase({
                 </CardHeader>
                 <CardContent>
                   <div
-                    className="rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center"
-                    style={{ minHeight: '200px' }}
+                    className="rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center relative"
+                    style={{ minHeight: '256px', height: '256px' }}
                   >
-                    <img
+                    <Image
                       src={previewUrl}
-                      alt="Your travel submission"
-                      className="w-full max-h-64 object-contain"
+                      alt="Submission preview"
+                      fill
+                      className="object-contain"
                     />
                   </div>
                 </CardContent>

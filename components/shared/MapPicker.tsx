@@ -1,6 +1,11 @@
 'use client';
 
-import { AdvancedMarker, APIProvider, Map as GoogleMap, MapMouseEvent } from '@vis.gl/react-google-maps';
+import {
+  AdvancedMarker,
+  APIProvider,
+  Map as GoogleMap,
+  MapMouseEvent,
+} from '@vis.gl/react-google-maps';
 import { useCallback } from 'react';
 import { Location } from '@/types/game';
 

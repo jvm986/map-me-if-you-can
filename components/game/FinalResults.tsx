@@ -1,8 +1,9 @@
 'use client';
 
-import { AdvancedMarker, APIProvider, Map } from '@vis.gl/react-google-maps';
+import { AdvancedMarker, APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { restartGame } from '@/lib/game-actions';
@@ -68,7 +69,7 @@ export default function FinalResults({
               <CardContent>
                 <APIProvider apiKey={apiKey}>
                   <div className="h-96 rounded-lg overflow-hidden border mb-4">
-                    <Map
+                    <GoogleMap
                       defaultZoom={2}
                       defaultCenter={{ lat: 20, lng: 0 }}
                       mapId="final-results-map"
@@ -81,7 +82,7 @@ export default function FinalResults({
                           position={{ lat: submission.true_lat, lng: submission.true_lng }}
                         />
                       ))}
-                    </Map>
+                    </GoogleMap>
                   </div>
                 </APIProvider>
 
@@ -92,17 +93,16 @@ export default function FinalResults({
                     return (
                       <div key={submission.id} className="space-y-1">
                         <div className="relative aspect-square rounded-lg overflow-hidden border bg-gray-100">
-                          <img
+                          <Image
                             src={submission.image_url}
-                            alt="Photo"
-                            className="w-full h-full object-cover"
+                            alt={`Submission by ${owner?.display_name}`}
+                            fill
+                            className="object-cover"
                           />
                         </div>
                         <div className="flex items-center gap-1">
                           <PlayerAvatar displayName={owner?.display_name || ''} size="sm" />
-                          <p className="text-xs text-gray-600 truncate">
-                            {owner?.display_name}
-                          </p>
+                          <p className="text-xs text-gray-600 truncate">{owner?.display_name}</p>
                         </div>
                       </div>
                     );
