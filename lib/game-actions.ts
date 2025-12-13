@@ -356,8 +356,73 @@ export async function getGuesses(photoSubmissionId: string): Promise<Guess[]> {
 }
 
 /**
- * Reveal results and update scores for the current round
- * Uses score_applied flag to prevent duplicate score updates
+ * Calculate a player's total score from all their applied guesses
+ * This is the source of truth for leaderboards
+ */
+export async function calculatePlayerScore(playerId: string): Promise<number> {
+  try {
+    const supabase = await createClient();
+
+    const { data, error } = await supabase
+      .from('guesses')
+      .select('total_score')
+      .eq('player_id', playerId)
+      .eq('score_applied', true);
+
+    if (error) throw error;
+
+    return data?.reduce((sum, guess) => sum + guess.total_score, 0) || 0;
+  } catch (error) {
+    console.error('Error calculating player score:', error);
+    return 0;
+  }
+}
+
+/**
+ * Calculate all players' scores for a game
+ * Returns a map of player_id to total_score
+ */
+export async function calculateGameScores(gameId: string): Promise<Map<string, number>> {
+  try {
+    const supabase = await createClient();
+
+    // Get all players in the game
+    const { data: players } = await supabase
+      .from('players')
+      .select('id')
+      .eq('game_id', gameId);
+
+    if (!players) return new Map();
+
+    // Get all applied guesses for these players in one query
+    const playerIds = players.map((p) => p.id);
+    const { data: guesses } = await supabase
+      .from('guesses')
+      .select('player_id, total_score')
+      .in('player_id', playerIds)
+      .eq('score_applied', true);
+
+    // Sum up scores by player
+    const scores = new Map<string, number>();
+    for (const player of players) {
+      scores.set(player.id, 0);
+    }
+    for (const guess of guesses || []) {
+      const current = scores.get(guess.player_id) || 0;
+      scores.set(guess.player_id, current + guess.total_score);
+    }
+
+    return scores;
+  } catch (error) {
+    console.error('Error calculating game scores:', error);
+    return new Map();
+  }
+}
+
+/**
+ * Reveal results for the current round
+ * Simply marks guesses as score_applied so they appear in the leaderboard
+ * This is idempotent and safe to call multiple times
  */
 export async function revealResults(
   gameCode: string,
@@ -366,34 +431,15 @@ export async function revealResults(
   try {
     const supabase = await createClient();
 
-    // Get all guesses for the current photo that haven't had scores applied yet
-    const { data: guesses } = await supabase
+    // Mark all guesses for this photo as score_applied
+    // This operation is idempotent - running it multiple times is safe
+    const { error: updateError } = await supabase
       .from('guesses')
-      .select('id, player_id, total_score, score_applied')
+      .update({ score_applied: true })
       .eq('photo_submission_id', currentPhotoId)
       .eq('score_applied', false);
 
-    // Update each player's total score
-    if (guesses && guesses.length > 0) {
-      for (const guess of guesses) {
-        const { data: player } = await supabase
-          .from('players')
-          .select('total_score')
-          .eq('id', guess.player_id)
-          .single();
-
-        if (player) {
-          // Update player's total score
-          await supabase
-            .from('players')
-            .update({ total_score: player.total_score + guess.total_score })
-            .eq('id', guess.player_id);
-
-          // Mark this guess as score_applied
-          await supabase.from('guesses').update({ score_applied: true }).eq('id', guess.id);
-        }
-      }
-    }
+    if (updateError) throw updateError;
 
     revalidatePath(`/game/${gameCode}`);
     return { success: true };

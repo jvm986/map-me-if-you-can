@@ -1,10 +1,10 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getGuesses, revealResults, submitGuess } from '@/lib/game-actions';
+import { calculateGameScores, getGuesses, revealResults, submitGuess } from '@/lib/game-actions';
 import { Game, Guess, Location, PhotoSubmission, Player } from '@/types/game';
 import MapPicker from '../shared/MapPicker';
 import PlayerAvatar from '../shared/PlayerAvatar';
@@ -30,6 +30,8 @@ export default function RoundPhase({
   const [guesses, setGuesses] = useState<Guess[]>([]);
   const [showReveal, setShowReveal] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
+  const isRevealingRef = useRef(false); // Track if reveal is in progress to prevent concurrent calls
+  const [playerScores, setPlayerScores] = useState<Map<string, number>>(new Map());
 
   const currentPhoto = submissions[game.current_photo_index];
   const hasGuessed = guesses.some((g) => g.player_id === currentPlayer?.id);
@@ -49,6 +51,7 @@ export default function RoundPhase({
   useEffect(() => {
     setShowReveal(false);
     setGuesses([]);
+    isRevealingRef.current = false; // Reset the revealing flag
   }, [currentPhoto?.id]);
 
   // Fetch and subscribe to guesses for current photo
@@ -86,12 +89,50 @@ export default function RoundPhase({
     }
   }, [currentPhoto]);
 
+  // Fetch and update player scores (calculated from score_applied guesses)
+  useEffect(() => {
+    const fetchScores = async () => {
+      const scores = await calculateGameScores(game.id);
+      setPlayerScores(scores);
+    };
+
+    fetchScores();
+
+    // Subscribe to realtime updates on guesses table to recalculate scores
+    const supabase = require('@/lib/supabase/client').createClient();
+    const channel = supabase
+      .channel('game-scores')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'guesses',
+        },
+        () => {
+          fetchScores();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [game.id]);
+
   // Auto-reveal when all eligible players have guessed
   useEffect(() => {
-    if (allEligibleGuessersHaveGuessed && !showReveal && currentPhoto) {
+    if (allEligibleGuessersHaveGuessed && !showReveal && !isRevealingRef.current && currentPhoto) {
+      // Use a ref to prevent concurrent calls to revealResults
+      isRevealingRef.current = true;
       const doReveal = async () => {
-        await revealResults(gameCode, currentPhoto.id);
-        setShowReveal(true);
+        try {
+          await revealResults(gameCode, currentPhoto.id);
+          setShowReveal(true);
+        } catch (error) {
+          console.error('Error auto-revealing results:', error);
+          isRevealingRef.current = false; // Reset on error so it can be retried
+        }
       };
       doReveal();
     }
@@ -240,7 +281,7 @@ export default function RoundPhase({
               <CardContent>
                 <div className="space-y-2">
                   {[...players]
-                    .sort((a, b) => b.total_score - a.total_score)
+                    .sort((a, b) => (playerScores.get(b.id) || 0) - (playerScores.get(a.id) || 0))
                     .map((player, index) => (
                       <div
                         key={player.id}
@@ -253,7 +294,7 @@ export default function RoundPhase({
                           <PlayerAvatar displayName={player.display_name} size="sm" />
                           <span className="text-sm truncate">{player.display_name}</span>
                         </div>
-                        <span className="font-bold text-sm">{player.total_score}</span>
+                        <span className="font-bold text-sm">{playerScores.get(player.id) || 0}</span>
                       </div>
                     ))}
                 </div>

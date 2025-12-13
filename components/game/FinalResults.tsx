@@ -3,10 +3,10 @@
 import { AdvancedMarker, APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { restartGame } from '@/lib/game-actions';
+import { calculateGameScores, restartGame } from '@/lib/game-actions';
 import { Game, PhotoSubmission, Player } from '@/types/game';
 import PlayerAvatar from '../shared/PlayerAvatar';
 
@@ -19,6 +19,7 @@ interface FinalResultsProps {
 }
 
 export default function FinalResults({
+  game,
   players,
   submissions,
   gameCode,
@@ -26,10 +27,22 @@ export default function FinalResults({
 }: FinalResultsProps) {
   const router = useRouter();
   const [isRestarting, setIsRestarting] = useState(false);
+  const [playerScores, setPlayerScores] = useState<Map<string, number>>(new Map());
   const isHost = currentPlayer?.is_host;
 
-  // Sort players by total score
-  const sortedPlayers = [...players].sort((a, b) => b.total_score - a.total_score);
+  // Fetch player scores on mount
+  useEffect(() => {
+    const fetchScores = async () => {
+      const scores = await calculateGameScores(game.id);
+      setPlayerScores(scores);
+    };
+    fetchScores();
+  }, [game.id]);
+
+  // Sort players by calculated score
+  const sortedPlayers = [...players].sort(
+    (a, b) => (playerScores.get(b.id) || 0) - (playerScores.get(a.id) || 0)
+  );
 
   const handlePlayAgain = async () => {
     setIsRestarting(true);
@@ -155,7 +168,7 @@ export default function FinalResults({
                         <PlayerAvatar displayName={player.display_name} size="sm" />
                         <span className="text-sm truncate">{player.display_name}</span>
                       </div>
-                      <span className="font-bold text-sm">{player.total_score}</span>
+                      <span className="font-bold text-sm">{playerScores.get(player.id) || 0}</span>
                     </div>
                   ))}
                 </div>
