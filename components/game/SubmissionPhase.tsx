@@ -231,7 +231,6 @@ export default function SubmissionPhase({
                         disabled={isProcessing}
                         required
                       />
-                      {isProcessing && <p className="text-sm text-blue-600">Processing image...</p>}
                     </div>
 
                     {/* Map Picker */}
@@ -245,11 +244,6 @@ export default function SubmissionPhase({
                           zoom={exifLocation ? 8 : 2}
                         />
                       </div>
-                      {location && (
-                        <p className="text-sm text-gray-600">
-                          Selected: {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                        </p>
-                      )}
                     </div>
 
                     <Button
