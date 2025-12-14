@@ -44,6 +44,7 @@ export interface Guess {
   location_score: number;
   owner_bonus: number;
   total_score: number;
+  score_applied: boolean;
   created_at: string;
   player?: Player; // For joins
 }
