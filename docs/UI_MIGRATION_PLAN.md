@@ -6,21 +6,22 @@ Refactor the current card-based layout into an immersive, fullscreen experience 
 - Fullscreen, zoomable images
 - Floating overlay controls
 - Bottom sheet/drawer map interface
-- State machine for game logic (XState)
+- Simple helper functions for game state logic
 - Presentational (dumb) view components
 
 **Approach:** Iterative development with testing at each phase. Since this is a new project with no production users, we'll refactor in place without feature flags.
+
+**Note:** We initially considered using XState for game state management, but determined that the database-driven architecture already provides clear state management. The `game.status` column is our single source of truth.
 
 ---
 
 ## Architecture Goals
 
-### 1. State Machine (Game Logic Layer)
-- **Extract all game logic** into XState machine
-- **Single source of truth** for game state
-- **Predictable transitions** between phases
-- **Testable** independent of UI
-- **Events:** `SUBMIT_GUESS`, `REVEAL_RESULTS`, `NEXT_ROUND`, etc.
+### 1. Simple State Management
+- **Database as source of truth** - `game.status` drives UI state
+- **Helper functions** for state checks and guards
+- **Server actions** handle all state transitions
+- **Realtime subscriptions** keep clients in sync
 
 ### 2. Presentational Components (View Layer)
 - **Receive props only** - no business logic
@@ -45,7 +46,7 @@ Refactor the current card-based layout into an immersive, fullscreen experience 
 
 1. **Add Dependencies**
    ```bash
-   pnpm add xstate @xstate/react vaul react-zoom-pan-pinch
+   pnpm add vaul react-zoom-pan-pinch
    pnpm add -D @storybook/react storybook  # Optional - only if you want component docs
    ```
 
@@ -53,9 +54,9 @@ Refactor the current card-based layout into an immersive, fullscreen experience 
    ```bash
    main
    └── feat/immersive-ui-refactor
-       ├── Phase 1: State machine
-       ├── Phase 2: Presentational components
-       ├── Phase 3: Fullscreen image
+       ├── Phase 1: Presentational components
+       ├── Phase 2: Fullscreen image
+       ├── Phase 3: Map overlay
        └── etc...
    ```
 
@@ -80,145 +81,7 @@ Refactor the current card-based layout into an immersive, fullscreen experience 
 
 ---
 
-## Phase 1: State Machine Foundation
-
-**Goal:** Extract game logic into XState machine without changing UI
-
-### Tasks
-
-1. **Design State Machine**
-   ```typescript
-   // lib/game-machine/types.ts
-   type GameContext = {
-     gameId: string
-     players: Player[]
-     currentPhotoIndex: number
-     guesses: Guess[]
-     // ... all game data
-   }
-
-   type GameStates =
-     | { value: 'lobby'; context: GameContext }
-     | { value: 'submission'; context: GameContext }
-     | { value: 'playing.guessing'; context: GameContext }
-     | { value: 'playing.revealing'; context: GameContext }
-     | { value: 'finished'; context: GameContext }
-   ```
-
-2. **Implement State Machine**
-   ```typescript
-   // lib/game-machine/machine.ts
-   import { createMachine } from 'xstate'
-
-   export const gameMachine = createMachine({
-     id: 'game',
-     initial: 'lobby',
-     context: { /* initial context */ },
-     states: {
-       lobby: {
-         on: {
-           START_SUBMISSION: 'submission'
-         }
-       },
-       submission: {
-         on: {
-           START_PLAYING: 'playing'
-         }
-       },
-       playing: {
-         initial: 'guessing',
-         states: {
-           guessing: {
-             on: {
-               REVEAL_RESULTS: 'revealing'
-             }
-           },
-           revealing: {
-             on: {
-               NEXT_ROUND: 'guessing',
-               FINISH_GAME: '#game.finished'
-             }
-           }
-         }
-       },
-       finished: {
-         on: {
-           RESTART: 'submission'
-         }
-       }
-     }
-   })
-   ```
-
-3. **Create Hook Wrapper**
-   ```typescript
-   // lib/game-machine/useGameMachine.ts
-   export function useGameMachine(gameCode: string) {
-     const [state, send] = useMachine(gameMachine, {
-       services: {
-         // Server actions as services
-         submitGuess: async (context, event) => {
-           return await submitGuess(...)
-         }
-       }
-     })
-
-     return {
-       state: state.value,
-       context: state.context,
-       can: (event: string) => state.can(event),
-       send,
-     }
-   }
-   ```
-
-4. **Write Tests**
-   ```typescript
-   // lib/game-machine/machine.test.ts
-   describe('Game State Machine', () => {
-     it('transitions from lobby to submission', () => {
-       const machine = interpret(gameMachine).start()
-       machine.send('START_SUBMISSION')
-       expect(machine.state.value).toBe('submission')
-     })
-
-     it('prevents invalid transitions', () => {
-       const machine = interpret(gameMachine).start()
-       machine.send('REVEAL_RESULTS') // Invalid from lobby
-       expect(machine.state.value).toBe('lobby')
-     })
-
-     // ... more tests
-   })
-   ```
-
-### Testing Checklist (Run after each change)
-```bash
-# 1. Unit tests
-pnpm test:run
-
-# 2. Type check & build
-pnpm run build
-
-# 3. Lint
-pnpm run check
-
-# 4. Manual testing
-pnpm dev
-# Test all game flows
-```
-
-### Success Criteria
-- ✅ State machine handles all game phases
-- ✅ All transitions tested
-- ✅ Components integrate with machine
-- ✅ All existing functionality works
-
-**Estimated Time:** 1-2 days
-
----
-
-## Phase 2: Presentational Component Layer
+## Phase 1: Presentational Component Layer
 
 **Goal:** Create dumb components that receive props and emit events
 
@@ -374,7 +237,7 @@ pnpm run check
 
 ---
 
-## Phase 3: Integrate Fullscreen Image View
+## Phase 2: Integrate Fullscreen Image View
 
 **Goal:** Replace image display in RoundPhase with fullscreen viewer
 
@@ -477,7 +340,7 @@ pnpm run build
 
 ---
 
-## Phase 4: Integrate Reveal Phase UI
+## Phase 3: Integrate Reveal Phase UI
 
 **Goal:** Update reveal phase with immersive overlay design
 
@@ -584,7 +447,7 @@ pnpm run check
 
 ---
 
-## Phase 5: Integrate Final Results
+## Phase 4: Integrate Final Results
 
 **Goal:** Fullscreen final results with photo gallery
 
@@ -716,7 +579,7 @@ pnpm run check
 
 ---
 
-## Phase 6: Polish & Performance
+## Phase 5: Polish & Performance
 
 **Goal:** Optimize performance, add animations, fix edge cases
 
@@ -819,7 +682,7 @@ pnpm run build
 
 ---
 
-## Phase 7: Final Polish & Documentation
+## Phase 6: Final Polish & Documentation
 
 **Goal:** Clean up and document the new architecture
 
@@ -1007,14 +870,13 @@ git reset --hard origin/main
 
 | Phase | Description | Time | Dependencies |
 |-------|-------------|------|--------------|
-| 0 | Preparation | 2-4h | None |
-| 1 | State Machine | 1-2d | Phase 0 |
-| 2 | Components | 2-3d | Phase 0 |
-| 3 | Fullscreen Image | 2-3d | Phase 1, 2 |
-| 4 | Reveal UI | 2d | Phase 3 |
-| 5 | Final Results | 1-2d | Phase 3, 4 |
-| 6 | Polish | 2-3d | Phase 3, 4, 5 |
-| 7 | Migration Complete | 1-2d | All phases |
+| 0 | Preparation | 30min | None |
+| 1 | Components | 2-3d | Phase 0 |
+| 2 | Fullscreen Image | 2-3d | Phase 1 |
+| 3 | Reveal UI | 2d | Phase 2 |
+| 4 | Final Results | 1-2d | Phase 2, 3 |
+| 5 | Polish | 2-3d | Phase 2, 3, 4 |
+| 6 | Migration Complete | 1-2d | All phases |
 | **Total** | **End-to-End** | **2-3 weeks** | |
 
 **Note:** Timeline assumes single developer working part-time. Adjust based on team size and availability.
@@ -1044,12 +906,12 @@ git reset --hard origin/main
 - Use progressive enhancement
 - Fallback UI patterns
 
-### Risk: State Machine Complexity
+### Risk: Component Complexity
 **Mitigation:**
-- Start simple, iterate
+- Keep components simple and focused
+- Extract reusable patterns
 - Thorough testing
 - Good documentation
-- Visualize state transitions (XState Viz)
 
 ### Risk: Scope Creep
 **Mitigation:**
@@ -1073,16 +935,15 @@ git reset --hard origin/main
 - Demo working features
 
 ### Major Milestones
-- Phase 3 complete: Playable with new UI
-- Phase 6 complete: Polish complete
-- Phase 7 complete: Refactor done
+- Phase 2 complete: Playable with new UI
+- Phase 5 complete: Polish complete
+- Phase 6 complete: Refactor done
 
 ---
 
 ## Resources
 
 ### Documentation
-- [XState Docs](https://xstate.js.org/docs/)
 - [Vaul (Drawer) Docs](https://github.com/emilkowalski/vaul)
 - [React Zoom Pan Pinch](https://github.com/BetterTyped/react-zoom-pan-pinch)
 - [GeoGuessr UI Reference](https://www.geoguessr.com/)
@@ -1090,7 +951,6 @@ git reset --hard origin/main
 ### Tools
 - React DevTools (profiling)
 - Chrome DevTools (Lighthouse)
-- XState Visualizer
 - Storybook
 
 ---
@@ -1115,6 +975,5 @@ git reset --hard origin/main
 4. Should we add animations with framer-motion?
 5. What's our target bundle size increase?
 6. Do we need Storybook for this project size?
-7. XState vs simpler state management?
 
 **Action:** Answer these questions, then start Phase 0.

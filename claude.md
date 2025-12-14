@@ -25,7 +25,6 @@
 - **Linting:** Biome (replaces ESLint + Prettier)
 
 ### Planned Additions
-- **State Management:** XState (for game state machine)
 - **Image Viewer:** react-zoom-pan-pinch (pan/zoom)
 - **Bottom Sheets:** vaul (mobile drawer/sheet)
 
@@ -251,23 +250,24 @@ Transform from card-based layout to fullscreen immersive experience:
 - Fullscreen, zoomable images
 - Floating overlay controls
 - Bottom sheet map interface (mobile-first)
-- State machine for game logic (XState)
 - Presentational (dumb) components
+- Database-driven state management (no state machine needed)
 
 ### Approach
 **No feature flags needed** - project has no production users, can refactor in place
 
-**7 Phases:**
+**6 Phases:**
 0. Setup (30min) - Install dependencies
-1. State Machine (1-2d) - Extract game logic to XState
-2. Components (2-3d) - Build presentational components
-3. Fullscreen Image (2-3d) - Image viewer + map overlay
-4. Reveal UI (2d) - Results overlay
-5. Final Results (1-2d) - Photo gallery
-6. Polish (2-3d) - Animations, performance, a11y
-7. Cleanup (1-2d) - Documentation
+1. Components (2-3d) - Build presentational components
+2. Fullscreen Image (2-3d) - Image viewer + map overlay
+3. Reveal UI (2d) - Results overlay
+4. Final Results (1-2d) - Photo gallery
+5. Polish (2-3d) - Animations, performance, a11y
+6. Cleanup (1-2d) - Documentation
 
 **Timeline:** 2-3 weeks total
+
+**Note:** We initially considered XState for state management, but realized the database already provides clear state through `game.status` (lobby → submission → playing → finished). Adding a client-side state machine would create redundant state and synchronization issues in a multiplayer game.
 
 **See:** `docs/UI_MIGRATION_PLAN.md` for full details
 
