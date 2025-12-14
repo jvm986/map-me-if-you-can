@@ -294,7 +294,9 @@ export default function RoundPhase({
                           <PlayerAvatar displayName={player.display_name} size="sm" />
                           <span className="text-sm truncate">{player.display_name}</span>
                         </div>
-                        <span className="font-bold text-sm">{playerScores.get(player.id) || 0}</span>
+                        <span className="font-bold text-sm">
+                          {playerScores.get(player.id) || 0}
+                        </span>
                       </div>
                     ))}
                 </div>

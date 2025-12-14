@@ -387,10 +387,7 @@ export async function calculateGameScores(gameId: string): Promise<Map<string, n
     const supabase = await createClient();
 
     // Get all players in the game
-    const { data: players } = await supabase
-      .from('players')
-      .select('id')
-      .eq('game_id', gameId);
+    const { data: players } = await supabase.from('players').select('id').eq('game_id', gameId);
 
     if (!players) return new Map();
 
