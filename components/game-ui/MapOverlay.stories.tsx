@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import type { Location } from '@/types/game';
 import { MapOverlay } from './MapOverlay';
@@ -23,6 +23,12 @@ type Story = StoryObj<typeof meta>;
 
 // Interactive version with state
 export const Interactive: Story = {
+  args: {
+    isOpen: true,
+    onClose: () => console.log('Close'),
+    onLocationSelect: (location) => console.log('Location selected:', location),
+    onSubmit: (location) => console.log('Location submitted:', location),
+  },
   render: (args) => {
     const [isOpen, setIsOpen] = useState(true);
     const [selectedLocation, setSelectedLocation] = useState<Location | undefined>(undefined);
