@@ -121,7 +121,9 @@ export default function UnifiedGameForm() {
     <div className="space-y-6">
       {/* Name field - shared for both actions */}
       <div className="space-y-2">
-        <Label htmlFor="displayName">Your Name</Label>
+        <Label htmlFor="displayName" className="text-base">
+          Your Name
+        </Label>
         <Input
           id="displayName"
           type="text"
@@ -130,28 +132,33 @@ export default function UnifiedGameForm() {
           onChange={(e) => setDisplayName(e.target.value)}
           disabled={isJoining || isCreating}
           maxLength={50}
+          className="h-12 text-base"
+          autoFocus
         />
       </div>
 
       {/* Join game section */}
-      <form onSubmit={handleJoinGame} className="space-y-4">
+      <form onSubmit={handleJoinGame} className="space-y-3">
         <div className="space-y-2">
-          <Label htmlFor="gameCode">Game Code</Label>
+          <Label htmlFor="gameCode" className="text-base">
+            Game Code
+          </Label>
           <div className="flex gap-2">
             <Input
               id="gameCode"
               type="text"
-              placeholder="e.g., A7K2M"
+              placeholder="A7K2M"
               value={gameCode}
               onChange={(e) => setGameCode(e.target.value.toUpperCase())}
               maxLength={5}
               disabled={isJoining || isCreating}
-              className="flex-1"
+              className="flex-1 h-12 text-base font-mono text-center text-lg tracking-wider"
             />
             <Button
               type="submit"
               disabled={isJoining || isCreating || !displayName.trim() || !gameCode.trim()}
               size="lg"
+              className="h-12 px-6"
             >
               {isJoining ? 'Joining...' : 'Join'}
             </Button>
@@ -162,10 +169,10 @@ export default function UnifiedGameForm() {
       {/* Separator */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200"></div>
+          <div className="w-full border-t"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="bg-white px-2 text-gray-500">or</span>
+          <span className="bg-background px-3 text-muted-foreground font-medium">or</span>
         </div>
       </div>
 
@@ -173,9 +180,9 @@ export default function UnifiedGameForm() {
       <Button
         onClick={handleCreateGame}
         disabled={isJoining || isCreating || !displayName.trim()}
-        className="w-full"
+        className="w-full h-12"
         size="lg"
-        variant="outline"
+        variant="secondary"
       >
         {isCreating ? 'Creating...' : 'Create New Game'}
       </Button>

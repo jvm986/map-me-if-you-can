@@ -1,29 +1,43 @@
+import { Map as MapIcon } from 'lucide-react';
 import { Suspense } from 'react';
 import UnifiedGameForm from '@/components/landing/UnifiedGameForm';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="w-full max-w-2xl">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-gray-900 mb-4">Map Me If You Can</h1>
-          <p className="text-2xl text-gray-600">A browser-based party game for remote teams</p>
-        </div>
+    <div className="relative min-h-screen w-screen overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" />
 
-        {/* Unified Form */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Get Started</CardTitle>
-            <CardDescription>Join an existing game or create a new one</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Suspense fallback={<div>Loading...</div>}>
+      {/* Center Content */}
+      <div className="absolute inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="w-full max-w-md space-y-8 pt-12 pb-20">
+          {/* Header */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex p-4 bg-primary/10 rounded-full mb-4">
+              <MapIcon className="w-12 h-12 text-primary" />
+            </div>
+            <h1 className="text-3xl xs:text-4xl sm:text-5xl font-bold text-gray-900 whitespace-nowrap px-2">
+              Map Me If You Can
+            </h1>
+            <p className="text-xl text-muted-foreground">
+              A browser-based party game for remote teams
+            </p>
+          </div>
+
+          {/* Unified Form */}
+          <div className="bg-background rounded-lg shadow-xl p-8">
+            <Suspense
+              fallback={<div className="text-center text-muted-foreground">Loading...</div>}
+            >
               <UnifiedGameForm />
             </Suspense>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Footer hint */}
+          <p className="text-center text-sm text-muted-foreground">
+            Upload photos • Guess locations • Compete with friends
+          </p>
+        </div>
       </div>
     </div>
   );

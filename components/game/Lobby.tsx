@@ -1,7 +1,8 @@
 'use client';
 
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Users } from 'lucide-react';
 import { useState } from 'react';
+import { FloatingActionButton } from '@/components/game-ui/FloatingActionButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,102 +64,95 @@ export default function Lobby({ players, currentPlayer, gameCode }: LobbyProps) 
   }
 
   const isHost = currentPlayer.is_host;
+  const hostPlayer = players.find((p) => p.is_host);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-2xl mx-auto py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Map Me If You Can</h1>
-          <p className="text-lg text-gray-600">Waiting for players...</p>
-        </div>
+    <div className="relative h-screen w-screen overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" />
 
-        {/* Game Code Card */}
-        <Card className="mb-6">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-2">Game Code</p>
+      {/* Center Content */}
+      <div className="absolute inset-0 flex items-center justify-center p-4 overflow-y-auto">
+        <div className="w-full max-w-md space-y-8 pt-12 pb-20">
+          {/* Header */}
+          <div className="text-center space-y-4">
+            <div className="inline-flex p-4 bg-primary/10 rounded-full mb-4">
+              <Users className="w-12 h-12 text-primary" />
+            </div>
+            <h1 className="text-3xl xs:text-4xl sm:text-5xl font-bold text-gray-900">
+              Map Me If You Can
+            </h1>
+            <p className="text-xl text-muted-foreground">Waiting for players to join...</p>
+          </div>
+
+          {/* Game Code & Players Card */}
+          <div className="bg-background rounded-lg shadow-xl p-8 space-y-6">
+            {/* Game Code */}
+            <div className="space-y-2 text-center">
+              <p className="text-sm text-muted-foreground">Share this code with your friends</p>
               <div className="flex items-center justify-center gap-2">
-                <code className="text-3xl font-mono font-bold bg-gray-100 px-4 py-2 rounded">
+                <code className="text-3xl font-mono font-bold bg-muted px-4 py-2 rounded-lg">
                   {gameCode}
                 </code>
-                <Button variant="outline" size="icon" onClick={copyGameCode}>
+                <Button variant="outline" size="icon" onClick={copyGameCode} className="h-10 w-10">
                   {isCopied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
-              <p className="text-sm text-gray-500 mt-2">
-                Share this code with your team to join the game
-              </p>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Players List */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Players ({players.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {players.map((player) => (
-                <div
-                  key={player.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <PlayerAvatar displayName={player.display_name} size="md" />
-                    <span className="font-medium">{player.display_name}</span>
+            {/* Players Grid */}
+            <div>
+              <h2 className="text-lg font-bold mb-3 text-center">Players ({players.length})</h2>
+              <div className="grid grid-cols-3 gap-3">
+                {players.map((player) => (
+                  <div
+                    key={player.id}
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 bg-muted/50 rounded-lg aspect-square"
+                  >
+                    <PlayerAvatar displayName={player.display_name} size="sm" />
+                    <div className="text-center w-full">
+                      <p className="font-medium text-xs truncate">{player.display_name}</p>
+                      <div className="flex gap-1 justify-center mt-1 flex-wrap">
+                        {player.is_host && (
+                          <Badge variant="secondary" className="text-xs">
+                            Host
+                          </Badge>
+                        )}
+                        {player.id === currentPlayer.id && <Badge className="text-xs">You</Badge>}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    {player.is_host && <Badge variant="secondary">Host</Badge>}
-                    {player.id === currentPlayer.id && <Badge>You</Badge>}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* Host Controls */}
-        {isHost && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Host Controls</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
-                When everyone has joined, start the submission phase so players can upload their
-                photos.
+            {/* Info messages */}
+            {!isHost && (
+              <p className="text-sm text-muted-foreground text-center">
+                Waiting for <span className="font-semibold">{hostPlayer?.display_name}</span> (host)
+                to start the game...
               </p>
-              <Button
-                onClick={handleStartSubmissions}
-                disabled={isStarting || players.length < 2}
-                className="w-full"
-                size="lg"
-              >
-                {isStarting ? 'Starting...' : 'Start Submission Phase'}
-              </Button>
-              {players.length < 2 && (
-                <p className="text-sm text-amber-600 text-center">
-                  Need at least 2 players to start
+            )}
+            {isHost && players.length < 2 && (
+              <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-4 text-center">
+                <p className="text-sm text-amber-900 dark:text-amber-100">
+                  Need at least 2 players to start the game
                 </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Non-host message */}
-        {!isHost && (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-gray-600">
-                Waiting for {players.find((p) => p.is_host)?.display_name} (host) to start the
-                game...
-              </p>
-            </CardContent>
-          </Card>
-        )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Host Controls FAB */}
+      {isHost && (
+        <FloatingActionButton
+          label={isStarting ? 'Starting...' : 'Start Submission Phase'}
+          onClick={handleStartSubmissions}
+          disabled={isStarting || players.length < 2}
+          position="bottom-center"
+        />
+      )}
     </div>
   );
 }
