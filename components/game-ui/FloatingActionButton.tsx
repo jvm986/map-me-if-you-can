@@ -31,7 +31,7 @@ export function FloatingActionButton({
         disabled={disabled}
         size="lg"
         variant={variant === 'secondary' ? 'secondary' : 'default'}
-        className={cn("shadow-lg min-w-[160px] font-semibold", className)}
+        className={cn('shadow-lg min-w-[160px] font-semibold', className)}
       >
         {label}
       </Button>

@@ -191,10 +191,7 @@ export default function FinalResults({
         }}
       >
         {submissions.map((submission, index) => (
-          <div
-            key={submission.id}
-            className="w-full h-full flex-shrink-0 snap-center relative"
-          >
+          <div key={submission.id} className="w-full h-full flex-shrink-0 snap-center relative">
             <Image
               src={submission.image_url}
               alt={`Submission by ${players.find((p) => p.id === submission.player_id)?.display_name}`}
@@ -244,9 +241,7 @@ export default function FinalResults({
               onClick={() => navigateToPhoto(index)}
               className={cn(
                 'h-2 rounded-full transition-all',
-                index === currentPhotoIndex
-                  ? 'bg-white w-6'
-                  : 'bg-white/40 w-2 hover:bg-white/60'
+                index === currentPhotoIndex ? 'bg-white w-6' : 'bg-white/40 w-2 hover:bg-white/60'
               )}
               aria-label={`Go to photo ${index + 1}`}
             />
@@ -280,7 +275,7 @@ export default function FinalResults({
                   className={cn(
                     'flex items-center gap-4 p-4 rounded-lg border transition-all',
                     index === 0 &&
-                    'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800',
+                      'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800',
                     index > 0 && 'bg-muted/50'
                   )}
                 >
@@ -333,11 +328,22 @@ export default function FinalResults({
 
           {/* Action Buttons */}
           <div className="flex gap-3">
-            <Button onClick={() => router.push('/')} variant="outline" size="lg" className="flex-1 bg-background/90 backdrop-blur-sm hover:bg-background">
+            <Button
+              onClick={() => router.push('/')}
+              variant="outline"
+              size="lg"
+              className="flex-1 bg-background/90 backdrop-blur-sm hover:bg-background"
+            >
               Back to Home
             </Button>
             {isHost && (
-              <Button onClick={handlePlayAgain} disabled={isRestarting} variant="outline" size="lg" className="flex-1 bg-background/90 backdrop-blur-sm hover:bg-background">
+              <Button
+                onClick={handlePlayAgain}
+                disabled={isRestarting}
+                variant="outline"
+                size="lg"
+                className="flex-1 bg-background/90 backdrop-blur-sm hover:bg-background"
+              >
                 {isRestarting ? 'Restarting...' : 'Play Again'}
               </Button>
             )}

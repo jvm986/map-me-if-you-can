@@ -26,7 +26,9 @@ export default function Home() {
 
           {/* Unified Form */}
           <div className="bg-background rounded-lg shadow-xl p-8">
-            <Suspense fallback={<div className="text-center text-muted-foreground">Loading...</div>}>
+            <Suspense
+              fallback={<div className="text-center text-muted-foreground">Loading...</div>}
+            >
               <UnifiedGameForm />
             </Suspense>
           </div>

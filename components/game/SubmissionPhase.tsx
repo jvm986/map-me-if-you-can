@@ -5,12 +5,12 @@ import { ImagePlus, MapPin } from 'lucide-react';
 import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { FloatingActionButton } from '@/components/game-ui/FloatingActionButton';
 import { FloatingHeader } from '@/components/game-ui/FloatingHeader';
 import { MapOverlay } from '@/components/game-ui/MapOverlay';
 import { WaitingMessage } from '@/components/game-ui/WaitingMessage';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { startPlaying, submitPhoto, uploadPhoto } from '@/lib/game-actions';
 import { resampleImageWithFallback } from '@/lib/image-utils';
 import { Game, Location, PhotoSubmission, Player } from '@/types/game';
@@ -218,7 +218,12 @@ export default function SubmissionPhase({
       {/* Background - gradient or submitted photo */}
       {hasSubmitted && mySubmission?.image_url ? (
         <>
-          <Image src={mySubmission.image_url} alt="Your submitted photo" fill className="object-cover" />
+          <Image
+            src={mySubmission.image_url}
+            alt="Your submitted photo"
+            fill
+            className="object-cover"
+          />
           <div className="absolute inset-0 bg-black/40" />
         </>
       ) : previewUrl ? (

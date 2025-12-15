@@ -8,6 +8,7 @@ import {
   MapOverlay,
   WaitingMessage,
 } from '@/components/game-ui';
+import { createClient } from '@/lib/supabase/client';
 import { getGuesses, revealResults, submitGuess } from '@/lib/game-actions';
 import type { Game, Guess, Location, PhotoSubmission, Player } from '@/types/game';
 import RevealPhase from './RevealPhase';
@@ -68,7 +69,7 @@ export default function RoundPhase({
 
       fetchGuesses();
 
-      const supabase = require('@/lib/supabase/client').createClient();
+      const supabase = createClient();
       const channel = supabase
         .channel(`guesses-${currentPhoto.id}`)
         .on(
@@ -165,7 +166,6 @@ export default function RoundPhase({
         guesses={guesses}
         isHost={isHost || false}
         gameCode={gameCode}
-        onContinue={() => setShowReveal(false)}
         submissions={submissions}
       />
     );

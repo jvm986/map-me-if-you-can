@@ -35,14 +35,7 @@ export function FullscreenImageViewer({
           contentClass="!w-full !h-full flex items-center justify-center"
         >
           <div className="relative w-full h-full">
-            <Image
-              src={imageUrl}
-              alt={alt}
-              fill
-              className="object-cover"
-              priority
-              sizes="100vw"
-            />
+            <Image src={imageUrl} alt={alt} fill className="object-cover" priority sizes="100vw" />
           </div>
         </TransformComponent>
       </TransformWrapper>

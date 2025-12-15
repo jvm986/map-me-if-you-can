@@ -3,9 +3,9 @@
 import { AdvancedMarker, APIProvider, Map as GoogleMap } from '@vis.gl/react-google-maps';
 import { Award, MapPin, Trophy } from 'lucide-react';
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { FloatingHeader } from '@/components/game-ui/FloatingHeader';
 import { FullscreenImageViewer } from '@/components/game-ui/FullscreenImageViewer';
+import { Button } from '@/components/ui/button';
 import { nextPhoto } from '@/lib/game-actions';
 import { cn } from '@/lib/utils';
 import { Game, Guess, PhotoSubmission, Player } from '@/types/game';
@@ -18,7 +18,6 @@ interface RevealPhaseProps {
   guesses: Guess[];
   isHost: boolean;
   gameCode: string;
-  onContinue: () => void;
   submissions: PhotoSubmission[];
 }
 

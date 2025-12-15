@@ -121,7 +121,9 @@ export default function UnifiedGameForm() {
     <div className="space-y-6">
       {/* Name field - shared for both actions */}
       <div className="space-y-2">
-        <Label htmlFor="displayName" className="text-base">Your Name</Label>
+        <Label htmlFor="displayName" className="text-base">
+          Your Name
+        </Label>
         <Input
           id="displayName"
           type="text"
@@ -138,7 +140,9 @@ export default function UnifiedGameForm() {
       {/* Join game section */}
       <form onSubmit={handleJoinGame} className="space-y-3">
         <div className="space-y-2">
-          <Label htmlFor="gameCode" className="text-base">Game Code</Label>
+          <Label htmlFor="gameCode" className="text-base">
+            Game Code
+          </Label>
           <div className="flex gap-2">
             <Input
               id="gameCode"

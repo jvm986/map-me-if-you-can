@@ -2,10 +2,10 @@
 
 import { Check, Copy, Users } from 'lucide-react';
 import { useState } from 'react';
+import { FloatingActionButton } from '@/components/game-ui/FloatingActionButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FloatingActionButton } from '@/components/game-ui/FloatingActionButton';
 import { startSubmissionPhase } from '@/lib/game-actions';
 import { Game, Player } from '@/types/game';
 import QuickJoinForm from '../landing/QuickJoinForm';
@@ -79,7 +79,9 @@ export default function Lobby({ players, currentPlayer, gameCode }: LobbyProps) 
             <div className="inline-flex p-4 bg-primary/10 rounded-full mb-4">
               <Users className="w-12 h-12 text-primary" />
             </div>
-            <h1 className="text-3xl xs:text-4xl sm:text-5xl font-bold text-gray-900">Map Me If You Can</h1>
+            <h1 className="text-3xl xs:text-4xl sm:text-5xl font-bold text-gray-900">
+              Map Me If You Can
+            </h1>
             <p className="text-xl text-muted-foreground">Waiting for players to join...</p>
           </div>
 
@@ -100,9 +102,7 @@ export default function Lobby({ players, currentPlayer, gameCode }: LobbyProps) 
 
             {/* Players Grid */}
             <div>
-              <h2 className="text-lg font-bold mb-3 text-center">
-                Players ({players.length})
-              </h2>
+              <h2 className="text-lg font-bold mb-3 text-center">Players ({players.length})</h2>
               <div className="grid grid-cols-3 gap-3">
                 {players.map((player) => (
                   <div
@@ -118,9 +118,7 @@ export default function Lobby({ players, currentPlayer, gameCode }: LobbyProps) 
                             Host
                           </Badge>
                         )}
-                        {player.id === currentPlayer.id && (
-                          <Badge className="text-xs">You</Badge>
-                        )}
+                        {player.id === currentPlayer.id && <Badge className="text-xs">You</Badge>}
                       </div>
                     </div>
                   </div>
@@ -131,7 +129,8 @@ export default function Lobby({ players, currentPlayer, gameCode }: LobbyProps) 
             {/* Info messages */}
             {!isHost && (
               <p className="text-sm text-muted-foreground text-center">
-                Waiting for <span className="font-semibold">{hostPlayer?.display_name}</span> (host) to start the game...
+                Waiting for <span className="font-semibold">{hostPlayer?.display_name}</span> (host)
+                to start the game...
               </p>
             )}
             {isHost && players.length < 2 && (
