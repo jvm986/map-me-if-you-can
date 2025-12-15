@@ -17,8 +17,8 @@ export function FloatingHeader({
   onMenuClick,
 }: FloatingHeaderProps) {
   return (
-    <div className="absolute top-0 left-0 right-0 z-30 p-4">
-      <div className="flex items-center justify-between bg-background/90 backdrop-blur-sm rounded-lg shadow-lg px-4 py-3 border">
+    <div className="fixed top-0 left-0 right-0 z-30 p-4 pointer-events-none">
+      <div className="flex items-center justify-between bg-background/90 backdrop-blur-sm rounded-lg shadow-lg px-4 py-3 border pointer-events-auto">
         {/* Left: Menu button */}
         {onMenuClick && (
           <button
@@ -34,7 +34,7 @@ export function FloatingHeader({
         {/* Center: Round info */}
         <div className="flex-1 flex flex-col items-center gap-1">
           <div className="text-sm font-medium">
-            Round {round} of {totalRounds}
+            {round === 0 ? 'Photo Submission' : `Round ${round} of ${totalRounds}`}
           </div>
           <div className="text-xs text-muted-foreground font-mono">{gameCode}</div>
         </div>

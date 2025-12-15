@@ -39,7 +39,7 @@ export function FullscreenImageViewer({
               src={imageUrl}
               alt={alt}
               fill
-              className="object-contain"
+              className="object-cover"
               priority
               sizes="100vw"
             />

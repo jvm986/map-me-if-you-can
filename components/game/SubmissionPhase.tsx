@@ -1,18 +1,19 @@
 'use client';
 
 import { parse as parseExif } from 'exifr';
+import { ImagePlus, MapPin } from 'lucide-react';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { FloatingActionButton } from '@/components/game-ui/FloatingActionButton';
+import { FloatingHeader } from '@/components/game-ui/FloatingHeader';
+import { MapOverlay } from '@/components/game-ui/MapOverlay';
+import { WaitingMessage } from '@/components/game-ui/WaitingMessage';
 import { startPlaying, submitPhoto, uploadPhoto } from '@/lib/game-actions';
 import { resampleImageWithFallback } from '@/lib/image-utils';
 import { Game, Location, PhotoSubmission, Player } from '@/types/game';
-import MapPicker from '../shared/MapPicker';
 import PlayerAvatar from '../shared/PlayerAvatar';
 
 interface SubmissionPhaseProps {
@@ -33,14 +34,19 @@ export default function SubmissionPhase({
   const [mounted, setMounted] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [location, setLocation] = useState<Location | null>(null);
-  const [exifLocation, setExifLocation] = useState<Location | null>(null);
+  const [location, setLocation] = useState<Location | undefined>(undefined);
+  const [exifLocation, setExifLocation] = useState<Location | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showMap, setShowMap] = useState(false);
+  const [showStatus, setShowStatus] = useState(false);
 
   const hasSubmitted = submissions.some((s) => s.player_id === currentPlayer?.id);
   const isHost = currentPlayer?.is_host;
+
+  // File input ref for triggering from button
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   // Track mount status to prevent hydration errors
   useEffect(() => {
@@ -61,8 +67,8 @@ export default function SubmissionPhase({
     if (!file) return;
 
     // Clear previous state
-    setLocation(null);
-    setExifLocation(null);
+    setLocation(undefined);
+    setExifLocation(undefined);
     setIsProcessing(true);
 
     // Revoke old preview URL if exists
@@ -112,14 +118,14 @@ export default function SubmissionPhase({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedFile || !location || !currentPlayer) {
+  const handleSubmit = async (location: Location) => {
+    if (!selectedFile || !currentPlayer) {
       return;
     }
 
     setIsSubmitting(true);
+    setShowMap(false);
+
     try {
       // Upload photo
       const uploadResult = await uploadPhoto(selectedFile, gameCode);
@@ -143,8 +149,8 @@ export default function SubmissionPhase({
         // Clear form
         setSelectedFile(null);
         setPreviewUrl(null);
-        setLocation(null);
-        setExifLocation(null);
+        setLocation(undefined);
+        setExifLocation(undefined);
       } else {
         toast.error(submitResult.error || 'Failed to submit photo. Please try again.');
       }
@@ -178,200 +184,236 @@ export default function SubmissionPhase({
 
   const mySubmission = submissions.find((s) => s.player_id === currentPlayer?.id);
 
+  const submittedCount = submissions.length;
+  const totalPlayers = players.length;
+  const allSubmitted = submittedCount === totalPlayers;
+
   // Show loading state during hydration to prevent mismatch
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <div className="max-w-4xl mx-auto py-8">
-          <div className="text-center mb-8">
-            <div className="h-10 w-64 bg-gray-200 rounded animate-pulse mx-auto mb-2" />
-            <div className="h-6 w-96 bg-gray-200 rounded animate-pulse mx-auto" />
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <div className="h-96 bg-gray-100 rounded-lg animate-pulse" />
-            </div>
-            <div className="space-y-6">
-              <div className="h-64 bg-gray-100 rounded-lg animate-pulse" />
-              <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
-            </div>
-          </div>
-        </div>
+      <div className="relative h-screen w-screen overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" />
       </div>
     );
   }
 
+  const waitingMessage = hasSubmitted
+    ? {
+        message: allSubmitted
+          ? isHost
+            ? 'All players submitted!'
+            : 'All players submitted!'
+          : `Waiting for ${totalPlayers - submittedCount} more ${totalPlayers - submittedCount === 1 ? 'player' : 'players'}...`,
+        submessage: allSubmitted
+          ? isHost
+            ? 'Click Start Game when ready'
+            : 'Waiting for host to start'
+          : `${submittedCount}/${totalPlayers} photos submitted`,
+        variant: allSubmitted ? ('success' as const) : ('waiting' as const),
+      }
+    : undefined;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-6xl mx-auto py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Your Photo</h1>
-          <p className="text-lg text-gray-600">Upload a travel photo and mark where it was taken</p>
-        </div>
+    <div className="relative h-screen w-screen overflow-hidden">
+      {/* Background - gradient or submitted photo */}
+      {hasSubmitted && mySubmission?.image_url ? (
+        <>
+          <Image src={mySubmission.image_url} alt="Your submitted photo" fill className="object-cover" />
+          <div className="absolute inset-0 bg-black/40" />
+        </>
+      ) : previewUrl ? (
+        <>
+          <Image src={previewUrl} alt="Preview" fill className="object-cover" />
+          <div className="absolute inset-0 bg-black/30" />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" />
+      )}
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Submission Form */}
-          <div className="lg:col-span-2">
-            {!hasSubmitted ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Upload Your Photo</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* File Input */}
-                    <div className="space-y-2">
-                      <Label htmlFor="photo">Photo</Label>
-                      <Input
-                        id="photo"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        disabled={isProcessing}
-                        required
-                      />
-                    </div>
+      {/* Floating Header */}
+      <FloatingHeader
+        round={0}
+        totalRounds={players.length}
+        gameCode={gameCode}
+        playerCount={players.length}
+      />
 
-                    {/* Map Picker */}
-                    <div className="space-y-2">
-                      <Label>Where was this photo taken? *</Label>
-                      <div className="h-96 rounded-lg overflow-hidden border">
-                        <MapPicker
-                          onLocationSelect={setLocation}
-                          selectedLocation={location}
-                          initialCenter={exifLocation || undefined}
-                          zoom={exifLocation ? 8 : 2}
-                        />
-                      </div>
-                    </div>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        disabled={isProcessing || hasSubmitted}
+        className="hidden"
+      />
 
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || isProcessing || !selectedFile || !location}
-                      className="w-full"
-                      size="lg"
-                    >
-                      {isSubmitting
-                        ? 'Submitting...'
-                        : isProcessing
-                          ? 'Processing...'
-                          : 'Submit Photo'}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
+      {/* Center Content */}
+      <div className="absolute inset-0 flex items-center justify-center p-4 overflow-y-auto pt-12 pb-20">
+        {!hasSubmitted ? (
+          <div className="bg-background rounded-lg shadow-xl p-8 max-w-md w-full text-center space-y-6">
+            <div>
+              <ImagePlus className="w-12 h-12 mx-auto mb-4 text-primary" />
+              <h1 className="text-3xl font-bold mb-2">Submit Your Photo</h1>
+              <p className="text-muted-foreground">
+                Upload a travel photo and mark where it was taken
+              </p>
+            </div>
+
+            {!selectedFile ? (
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing}
+                size="lg"
+                className="w-full"
+              >
+                {isProcessing ? 'Processing...' : 'Choose Photo'}
+              </Button>
             ) : (
-              <div className="relative h-96 rounded-lg overflow-hidden shadow-lg">
-                {/* Background Image - fills frame completely */}
-                {mySubmission?.image_url && (
-                  <>
-                    <Image
-                      src={mySubmission.image_url}
-                      alt="Your submitted location"
-                      fill
-                      className="object-cover"
-                    />
-                    {/* Dark overlay for text readability */}
-                    <div className="absolute inset-0 bg-black/50" />
-                  </>
-                )}
-
-                {/* Text Content Overlay */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
-                  <div className="bg-white/95 backdrop-blur-sm rounded-lg p-8 shadow-xl max-w-md">
-                    <h3 className="text-3xl font-bold mb-3 text-gray-900">Photo Submitted! ✓</h3>
-                    <p className="text-gray-600">
-                      {submissions.length === players.length
-                        ? isHost
-                          ? 'All players have submitted! Click Start Game to start playing.'
-                          : 'All players have submitted their photos. Please wait for the host to start the game.'
-                        : 'Waiting for other players to submit their photos...'}
-                    </p>
+              <>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="flex-1 text-left truncate">{selectedFile.name}</div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                        setLocation(undefined);
+                        setExifLocation(undefined);
+                      }}
+                    >
+                      Change
+                    </Button>
                   </div>
+
+                  {location && (
+                    <div className="flex items-center gap-2 text-sm text-green-600">
+                      <MapPin className="h-4 w-4" />
+                      <span>Location marked</span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Photo Preview - only show during upload, not after submission */}
-            {previewUrl && !hasSubmitted && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Your Photo</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div
-                    className="rounded-lg overflow-hidden border bg-gray-100 flex items-center justify-center relative"
-                    style={{ minHeight: '256px', height: '256px' }}
-                  >
-                    <Image
-                      src={previewUrl}
-                      alt="Submission preview"
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Submission Status */}
-            {/* Submission Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Submission Status</CardTitle>
-              </CardHeader>
-              <CardContent>
                 <div className="space-y-2">
-                  {players.map((player) => {
-                    const hasPlayerSubmitted = submissions.some((s) => s.player_id === player.id);
-                    return (
-                      <div
-                        key={player.id}
-                        className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                      >
-                        <div className="flex items-center gap-2">
-                          <PlayerAvatar displayName={player.display_name} size="sm" />
-                          <span className="text-sm">{player.display_name}</span>
-                        </div>
-                        {hasPlayerSubmitted ? (
-                          <Badge variant="default">✓</Badge>
-                        ) : (
-                          <Badge variant="outline">Waiting</Badge>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Host Controls */}
-            {isHost && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Host Controls</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
                   <Button
-                    onClick={handleStartPlaying}
-                    disabled={isStarting || submissions.length < 2}
+                    onClick={() => setShowMap(true)}
+                    variant={location ? 'outline' : 'default'}
+                    size="lg"
                     className="w-full"
                   >
-                    {isStarting ? 'Starting...' : 'Start Game'}
+                    <MapPin className="h-5 w-5 mr-2" />
+                    {location ? 'Change Location' : 'Mark Location'}
                   </Button>
-                  <p className="text-xs text-center text-gray-500">
-                    {submissions.length} of {players.length} submitted
-                  </p>
-                </CardContent>
-              </Card>
+
+                  {location && (
+                    <Button
+                      onClick={() => handleSubmit(location)}
+                      disabled={isSubmitting}
+                      size="lg"
+                      className="w-full"
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit Photo'}
+                    </Button>
+                  )}
+                </div>
+              </>
             )}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowStatus(true)}
+              className="w-full"
+            >
+              View Status ({submittedCount}/{totalPlayers})
+            </Button>
+          </div>
+        ) : (
+          waitingMessage && (
+            <WaitingMessage
+              message={waitingMessage.message}
+              submessage={waitingMessage.submessage}
+              variant={waitingMessage.variant}
+              showSpinner={!allSubmitted}
+            />
+          )
+        )}
+      </div>
+
+      {/* Floating Action Button for Status */}
+      {!hasSubmitted && (
+        <FloatingActionButton
+          label={`Status (${submittedCount}/${totalPlayers})`}
+          onClick={() => setShowStatus(true)}
+          variant="secondary"
+          position="bottom-left"
+        />
+      )}
+
+      {/* Host Controls FAB */}
+      {isHost && allSubmitted && (
+        <FloatingActionButton
+          label={isStarting ? 'Starting...' : 'Start Game'}
+          onClick={handleStartPlaying}
+          disabled={isStarting}
+          position="bottom-center"
+          className="bg-white hover:bg-white/90 text-gray-900"
+        />
+      )}
+
+      {/* Map Overlay */}
+      <MapOverlay
+        isOpen={showMap}
+        onClose={() => setShowMap(false)}
+        onLocationSelect={setLocation}
+        onSubmit={handleSubmit}
+        selectedLocation={location}
+        submitLabel="Confirm Location"
+        initialCenter={exifLocation || undefined}
+        zoom={exifLocation ? 8 : 2}
+      />
+
+      {/* Status Drawer */}
+      {showStatus && (
+        <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6 border-b">
+              <h2 className="text-2xl font-bold">Submission Status</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {submittedCount} of {totalPlayers} players have submitted
+              </p>
+            </div>
+            <div className="p-6 space-y-2 max-h-96 overflow-y-auto">
+              {players.map((player) => {
+                const hasPlayerSubmitted = submissions.some((s) => s.player_id === player.id);
+                return (
+                  <div
+                    key={player.id}
+                    className="flex items-center justify-between p-3 bg-muted/50 rounded-lg"
+                  >
+                    <div className="flex items-center gap-2">
+                      <PlayerAvatar displayName={player.display_name} size="sm" />
+                      <span className="text-sm font-medium">{player.display_name}</span>
+                    </div>
+                    {hasPlayerSubmitted ? (
+                      <Badge>✓ Submitted</Badge>
+                    ) : (
+                      <Badge variant="outline">Waiting</Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="p-6 border-t">
+              <Button onClick={() => setShowStatus(false)} className="w-full">
+                Close
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

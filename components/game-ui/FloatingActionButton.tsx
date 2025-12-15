@@ -16,6 +16,7 @@ export function FloatingActionButton({
   disabled = false,
   variant = 'primary',
   position = 'bottom-center',
+  className,
 }: FloatingActionButtonProps) {
   const positionClasses = {
     'bottom-left': 'bottom-4 left-4',
@@ -30,7 +31,7 @@ export function FloatingActionButton({
         disabled={disabled}
         size="lg"
         variant={variant === 'secondary' ? 'secondary' : 'default'}
-        className="shadow-lg min-w-[160px] font-semibold"
+        className={cn("shadow-lg min-w-[160px] font-semibold", className)}
       >
         {label}
       </Button>

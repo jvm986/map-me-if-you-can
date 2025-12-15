@@ -27,6 +27,8 @@ export interface MapOverlayProps {
   selectedLocation?: Location;
   submitDisabled?: boolean;
   submitLabel?: string;
+  initialCenter?: Location;
+  zoom?: number;
 }
 
 /**
@@ -49,6 +51,7 @@ export interface FloatingActionButtonProps {
   disabled?: boolean;
   variant?: 'primary' | 'secondary';
   position?: 'bottom-left' | 'bottom-right' | 'bottom-center';
+  className?: string;
 }
 
 /**
